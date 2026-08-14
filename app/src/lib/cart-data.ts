@@ -14,6 +14,7 @@ export type CartGraph = {
   edgesNameIdx: number[];
   edgesPath: number[];
   names: string[];
+  forbidden: [number, number][][];
   pois: CartPoi[];
   bbox: number[];
 };
