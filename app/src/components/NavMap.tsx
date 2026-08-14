@@ -131,6 +131,7 @@ export default function NavMap({
       };
       walk(b, false);
       walk(a, true);
+      if (!wantPath && cname < 0) continue; // don't draw the unnamed connector web
       chains.push({ coords: chain as [number, number][], name: cname >= 0 ? g.names[cname] : "" });
     }
     if (!chains.length) return null;
@@ -146,8 +147,14 @@ export default function NavMap({
       {
         interactive: false,
         style: (f: any) => {
-          // one solid green for every legal way (trails, streets, drives)
-          return { color: "#2f8b4e", weight: 3, opacity: 0.9 };
+          const nm = f.properties?.name || "";
+          if (f.properties?.kind === "road") {
+            return { color: "#aeb4ad", weight: 1.8, opacity: 0.55 };
+          }
+          if (nm) {
+            return { color: "#1f9d55", weight: 4.5, opacity: 0.95 };
+          }
+          return { color: "#74c08a", weight: 2.2, opacity: 0.6 };
         },
       },
     );
@@ -183,6 +190,16 @@ export default function NavMap({
     if (paths) {
       paths.addTo(map);
       netLayers.current.paths = paths;
+      try {
+        paths.eachLayer((ly: any) => {
+          const nm = ly.feature?.properties?.name;
+          if (!nm) return;
+          const raw = ly.getLatLngs();
+          const flat = Array.isArray(raw) ? raw.flat(Infinity) : raw;
+          const mid = flat && flat.length ? flat[Math.floor(flat.length / 2)] : null;
+          if (mid) ly.bindTooltip(nm, { permanent: true, direction: "center", className: "cn-trail-label", opacity: 0.95 });
+        });
+      } catch {}
     }
     if (roads) {
       roads.addTo(map);
