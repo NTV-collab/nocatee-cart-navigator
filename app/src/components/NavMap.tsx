@@ -19,6 +19,21 @@ type Props = {
 
 const CART_GLYPH = `<svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="9.5" width="12" height="5.5" rx="1.6"/><path d="M9.5 9.5V6.2h4.6a1.9 1.9 0 0 1 1.9 1.9v1.4"/><path d="M10.5 6.2 9.8 4.6"/><circle cx="7.2" cy="16.2" r="1.5"/><circle cx="13.8" cy="16.2" r="1.5"/><path d="M17.5 8h1.8a1 1 0 0 1 1 1v3.4"/></svg>`;
 
+// Official Nocatee trail colors (Fitness Trails map legend).
+const TRAIL_COLORS: Record<string, string> = {
+  "Osprey Trail": "#e9b43c",
+  "Pelican Trail": "#ec8f25",
+  "Heron Trail": "#3d9c4f",
+  "Egret Trail": "#a8cf66",
+  "Peacock Trail": "#d64541",
+  "Eagle Trail": "#e57aa8",
+  "Herring Trail": "#3e5ba7",
+  "Nocatee Preserve Trail": "#8a6446",
+  "Seagull Trail": "#63b7dd",
+  "Spoonbill Trail": "#8a5bb5",
+  "Darter Trail": "#5b2d8c",
+};
+
 // Raster tile chain: plain <img> tiles, no WebGL, no workers.
 const TILE_CHAIN: { url: string; opts: Record<string, unknown> }[] = [
   {
@@ -66,12 +81,15 @@ export default function NavMap({
   const [mapReady, setMapReady] = useState(false);
   const [redrawTick, setRedrawTick] = useState(0);
 
-  // Merge raw edges into continuous polylines (paths or roads) -> fewer, longer lines.
+  // Merge raw edges into continuous polylines, splitting at name changes so
+  // each trail keeps its official color boundary.
   function buildChains(L: any, g: CartGraph, wantPath: boolean) {
     const m = g.edgesA.length;
     const adj = new Map<number, [number, number][]>();
+    const names: Map<string, number> = new Map();
     const lonOf = (i: number) => g.nodes[i * 2 + 1];
     const latOf = (i: number) => g.nodes[i * 2];
+    const keyOf = (a: number, b: number) => (a < b ? a + "_" + b : b + "_" + a);
     for (let i = 0; i < m; i++) {
       if ((g.edgesPath[i] === 1) !== wantPath) continue;
       const a = g.edgesA[i];
@@ -80,70 +98,65 @@ export default function NavMap({
       if (!adj.has(b)) adj.set(b, []);
       adj.get(a)!.push([b, i]);
       adj.get(b)!.push([a, i]);
+      names.set(keyOf(a, b), g.edgesNameIdx[i]);
     }
     const used = new Set<number>();
-    const chains: [number, number][][] = [];
+    const chains: { coords: [number, number][]; name: string }[] = [];
     for (let seed = 0; seed < m; seed++) {
       if (used.has(seed) || (g.edgesPath[seed] === 1) !== wantPath) continue;
       used.add(seed);
       const a = g.edgesA[seed];
       const b = g.edgesB[seed];
-      const chain: [number, number][] = [
+      const cname = g.edgesNameIdx[seed];
+      const chain: number[][] = [
         [lonOf(a), latOf(a)],
         [lonOf(b), latOf(b)],
       ];
-      let cur = b;
-      for (;;) {
-        const nbs = adj.get(cur);
-        let nxt: number | null = null;
-        if (nbs) {
-          for (const [to, j] of nbs) {
-            if (!used.has(j)) {
+      const walk = (cur: number, pushFront: boolean) => {
+        for (;;) {
+          const nbs = adj.get(cur);
+          let nxt: number | null = null;
+          if (nbs) {
+            for (const [to, j] of nbs) {
+              if (used.has(j)) continue;
+              const jn = names.get(keyOf(cur, to)) ?? -1;
+              if (jn !== cname) continue;
               nxt = to;
               used.add(j);
               break;
             }
           }
+          if (nxt === null) break;
+          if (pushFront) chain.unshift([lonOf(nxt), latOf(nxt)]);
+          else chain.push([lonOf(nxt), latOf(nxt)]);
+          cur = nxt;
         }
-        if (nxt === null) break;
-        chain.push([lonOf(nxt), latOf(nxt)]);
-        cur = nxt;
-      }
-      cur = a;
-      for (;;) {
-        const nbs = adj.get(cur);
-        let nxt: number | null = null;
-        if (nbs) {
-          for (const [to, j] of nbs) {
-            if (!used.has(j)) {
-              nxt = to;
-              used.add(j);
-              break;
-            }
-          }
-        }
-        if (nxt === null) break;
-        chain.unshift([lonOf(nxt), latOf(nxt)]);
-        cur = nxt;
-      }
-      chains.push(chain);
+      };
+      walk(b, false);
+      walk(a, true);
+      chains.push({ coords: chain as [number, number][], name: cname >= 0 ? g.names[cname] : "" });
     }
     if (!chains.length) return null;
     return L.geoJSON(
       {
         type: "FeatureCollection",
-        features: chains.map((coords) => ({
+        features: chains.map((c) => ({
           type: "Feature",
-          properties: { c: wantPath ? 1 : 0 },
-          geometry: { type: "LineString", coordinates: coords },
+          properties: { kind: wantPath ? "path" : "road", name: c.name },
+          geometry: { type: "LineString", coordinates: c.coords },
         })),
       },
       {
         interactive: false,
-        style: {
-          color: wantPath ? "#1e7c66" : "#8d9a94",
-          weight: wantPath ? 3.4 : 2.4,
-          opacity: wantPath ? 0.85 : 0.55,
+        style: (f: any) => {
+          const nm = f.properties?.name || "";
+          if (f.properties?.kind === "road") {
+            return { color: "#8d9a94", weight: 2.2, opacity: 0.55 };
+          }
+          if (nm && TRAIL_COLORS[nm]) {
+            return { color: TRAIL_COLORS[nm], weight: 3.6, opacity: 0.95 };
+          }
+          return { color: "#1e7c66", weight: 3.2, opacity: 0.8 };
         },
       },
     );
