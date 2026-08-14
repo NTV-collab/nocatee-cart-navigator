@@ -333,7 +333,7 @@ export default function NavMap({
     if (rt && rt.points.length > 1) {
       const ll = rt.points.map((p) => [p.lat, p.lng]);
       const casing = L.polyline(ll, { color: "#ffffff", weight: 12, opacity: 0.9, interactive: false });
-      const line = L.polyline(ll, { color: "#1e7c66", weight: 5.5, opacity: 0.98, interactive: false });
+      const line = L.polyline(ll, { color: "#1e88e5", weight: 5.5, opacity: 0.98, interactive: false });
       casing.addTo(group);
       line.addTo(group);
     }
