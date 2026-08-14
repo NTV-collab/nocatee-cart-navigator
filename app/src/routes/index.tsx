@@ -25,6 +25,20 @@ function Index() {
   const [pickMode, setPickMode] = useState<"start" | "end">("end");
   const [search, setSearch] = useState("");
   const [locating, setLocating] = useState(false);
+  const [tracking, setTracking] = useState(false);
+  const [locPos, setLocPos] = useState<MapPoint | null>(null);
+  const [locAcc, setLocAcc] = useState<number | null>(null);
+  const locWatch = useRef<number | null>(null);
+
+  // stop live tracking when the page unmounts
+  useEffect(() => {
+    return () => {
+      if (locWatch.current != null && typeof navigator !== "undefined") {
+        navigator.geolocation.clearWatch(locWatch.current);
+        locWatch.current = null;
+      }
+    };
+  }, []);
   const routerRef = useRef<CartRouter | null>(null);
 
   useEffect(() => {
@@ -81,6 +95,32 @@ function Index() {
         setLocating(false);
       },
       { enableHighAccuracy: true, timeout: 12000 },
+    );
+  }, []);
+
+  const toggleTracking = useCallback(() => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) return;
+    if (locWatch.current != null) {
+      navigator.geolocation.clearWatch(locWatch.current);
+      locWatch.current = null;
+      setTracking(false);
+      return;
+    }
+    setTracking(true);
+    setPickMode("end");
+    locWatch.current = navigator.geolocation.watchPosition(
+      (pos) => {
+        const pt: MapPoint = { lat: pos.coords.latitude, lng: pos.coords.longitude, label: "My location" };
+        setLocPos(pt);
+        setLocAcc(pos.coords.accuracy ?? null);
+        setStart(pt);
+      },
+      () => {
+        setTracking(false);
+        if (locWatch.current != null) navigator.geolocation.clearWatch(locWatch.current);
+        locWatch.current = null;
+      },
+      { enableHighAccuracy: true, maximumAge: 2000, timeout: 20000 },
     );
   }, []);
 
@@ -296,9 +336,38 @@ function Index() {
                 end={end}
                 route={route}
                 pickMode={pickMode}
+                locPos={locPos}
+                locAcc={locAcc}
+                follow={tracking}
                 onMapClick={onMapClick}
                 onReady={() => setReady(true)}
               />
+
+              {/* live location control */}
+              <div className="absolute right-3 top-3 z-[500] flex items-center gap-2">
+                <button
+                  onClick={toggleTracking}
+                  title={tracking ? "Stop following my location" : "Follow my location live"}
+                  aria-label={tracking ? "Stop live tracking" : "Start live tracking"}
+                  className={
+                    "grid size-11 place-items-center rounded-full border shadow-md transition active:scale-95 " +
+                    (tracking
+                      ? "border-cn-teal bg-cn-teal text-white"
+                      : "border-cn-line bg-white/95 text-cn-ink-soft hover:text-cn-teal-deep")
+                  }
+                >
+                  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="7" />
+                    <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+                    <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
+                  </svg>
+                </button>
+                {tracking && (
+                  <span className="rounded-full bg-cn-teal px-2.5 py-1 font-mono text-[10px] font-semibold tracking-[0.14em] text-white shadow">
+                    LIVE
+                  </span>
+                )}
+              </div>
 
               {/* destination chips */}
               <div className="absolute inset-x-0 bottom-0 z-[400] bg-gradient-to-t from-cn-paper via-cn-paper/95 to-transparent px-4 pt-10 pb-4">

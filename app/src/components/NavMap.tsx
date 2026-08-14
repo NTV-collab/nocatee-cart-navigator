@@ -8,20 +8,23 @@ type Props = {
   end: MapPoint | null;
   route: RouteResult | null;
   pickMode: "start" | "end";
+  locPos: MapPoint | null;
+  locAcc: number | null;
+  follow: boolean;
   onMapClick: (p: MapPoint) => void;
   onReady: () => void;
 };
 
 const ROAD_MIN_ZOOM = 13.5;
 
-export default function NavMap({ graph, start, end, route, pickMode, onMapClick, onReady }: Props) {
+export default function NavMap({ graph, start, end, route, pickMode, locPos, locAcc, follow, onMapClick, onReady }: Props) {
   const holder = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const LRef = useRef<any>(null);
   const netLayers = useRef<{ paths?: any; roads?: any }>({});
   const routeGroup = useRef<any>(null);
-  const live = useRef({ graph, start, end, route, pickMode, onMapClick, onReady });
-  live.current = { graph, start, end, route, pickMode, onMapClick, onReady };
+  const live = useRef({ graph, start, end, route, pickMode, locPos, locAcc, follow, onMapClick, onReady });
+  live.current = { graph, start, end, route, pickMode, locPos, locAcc, follow, onMapClick, onReady };
   const readyFired = useRef(false);
 
   // Merge the raw edge list into continuous polylines (paths or roads).
@@ -52,7 +55,6 @@ export default function NavMap({ graph, start, end, route, pickMode, onMapClick,
         [lonOf(a), latOf(a)],
         [lonOf(b), latOf(b)],
       ];
-      // extend forward from b
       let cur = b;
       for (;;) {
         const nbs = adj.get(cur);
@@ -70,7 +72,6 @@ export default function NavMap({ graph, start, end, route, pickMode, onMapClick,
         chain.push([lonOf(nxt), latOf(nxt)]);
         cur = nxt;
       }
-      // extend backward from a
       cur = a;
       for (;;) {
         const nbs = adj.get(cur);
@@ -142,6 +143,7 @@ export default function NavMap({ graph, start, end, route, pickMode, onMapClick,
   useEffect(() => {
     let disposed = false;
     let map: any = null;
+    let ro: ResizeObserver | null = null;
     void import("leaflet")
       .then((Mod) => {
         if (disposed || !holder.current) return;
@@ -162,6 +164,16 @@ export default function NavMap({ graph, start, end, route, pickMode, onMapClick,
           live.current.onMapClick({ lat: ev.latlng.lat, lng: ev.latlng.lng });
         });
         mapRef.current = map;
+        // The container can have a wrong (zero) size on first mount while the
+        // layout settles; re-measure so the full tile grid fills the well.
+        const fixSize = () => {
+          if (mapRef.current && holder.current) {
+            mapRef.current.invalidateSize();
+          }
+        };
+        ro = new ResizeObserver(fixSize);
+        ro.observe(holder.current);
+        window.setTimeout(fixSize, 120);
         drawNetwork();
         if (!readyFired.current) {
           readyFired.current = true;
@@ -173,6 +185,7 @@ export default function NavMap({ graph, start, end, route, pickMode, onMapClick,
       });
     return () => {
       disposed = true;
+      if (ro) ro.disconnect();
       if (map) {
         map.remove();
       }
@@ -188,7 +201,7 @@ export default function NavMap({ graph, start, end, route, pickMode, onMapClick,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [graph]);
 
-  // ---- start / end / route changes ----
+  // ---- start / end / route / location changes ----
   useEffect(() => {
     const L = LRef.current;
     const map = mapRef.current;
@@ -199,7 +212,7 @@ export default function NavMap({ graph, start, end, route, pickMode, onMapClick,
     }
     const svg = L.svg({ padding: 0.5 });
     const group = L.layerGroup();
-    const { start: st, end: en, route: rt } = live.current;
+    const { start: st, end: en, route: rt, locPos: lp, locAcc: ac } = live.current;
     const mk = (lat: number, lng: number, letter: string, cls: string) => {
       const icon = L.divIcon({
         className: "",
@@ -211,6 +224,27 @@ export default function NavMap({ graph, start, end, route, pickMode, onMapClick,
     };
     if (st) group.addLayer(mk(st.lat, st.lng, "A", "cn-marker-start"));
     if (en) group.addLayer(mk(en.lat, en.lng, "B", "cn-marker-end"));
+    if (lp) {
+      const ring = L.circle([lp.lat, lp.lng], {
+        radius: Math.max(ac ?? 12, 8),
+        color: "#2fae9a",
+        weight: 1,
+        opacity: 0.4,
+        fillColor: "#2fae9a",
+        fillOpacity: 0.1,
+        interactive: false,
+      });
+      const dot = L.circleMarker([lp.lat, lp.lng], {
+        radius: 8,
+        color: "#ffffff",
+        weight: 3,
+        fillColor: "#0e7c66",
+        fillOpacity: 1,
+        interactive: false,
+      });
+      group.addLayer(ring);
+      group.addLayer(dot);
+    }
     if (rt && rt.points.length > 1) {
       const ll = rt.points.map((p) => [p.lat, p.lng]);
       const casing = L.polyline(ll, { color: "#ffffff", weight: 13, opacity: 0.9, interactive: false, renderer: svg });
@@ -230,10 +264,20 @@ export default function NavMap({ graph, start, end, route, pickMode, onMapClick,
     }
     if (bounds.length >= 2) {
       map.fitBounds(L.latLngBounds(bounds), { padding: [46, 46], maxZoom: 15 });
-    } else if (bounds.length === 1) {
+    } else if (bounds.length === 1 && !lp) {
       map.setView([bounds[0][0], bounds[0][1]], 15);
     }
-  }, [start, end, route]);
+  }, [start, end, route, locPos, locAcc]);
+
+  // ---- live follow: keep the viewport on the location ----
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const { locPos: lp, follow: f } = live.current;
+    if (lp && f) {
+      map.setView([lp.lat, lp.lng], Math.max(map.getZoom(), 15), { animate: true });
+    }
+  }, [locPos, follow]);
 
   return <div ref={holder} className="h-full w-full" aria-label="Nocatee cart path map" />;
 }
