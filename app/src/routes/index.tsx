@@ -58,6 +58,12 @@ function Index() {
     };
   }, []);
 
+  // safety net: never leave the user on a blocking loading screen
+  useEffect(() => {
+    const t = window.setTimeout(() => setReady(true), 5000);
+    return () => window.clearTimeout(t);
+  }, []);
+
   // recompute route whenever start/end change
   useEffect(() => {
     const r = routerRef.current;

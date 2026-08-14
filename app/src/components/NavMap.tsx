@@ -17,14 +17,25 @@ type Props = {
   onReady: () => void;
 };
 
-// CARTO free vector basemap (Google-Maps style, no API key needed).
-const STREET_STYLE_URL = "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json";
-const SAT_SOURCE: any = {
-  type: "raster",
-  tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
-  tileSize: 256,
-  maxzoom: 19,
-  attribution: "Esri, Maxar, Earthstar Geographics, and the GIS User Community",
+// Raster tile chain: plain <img> tiles, no WebGL, no workers. If a provider
+// fails to deliver, we swap to the next one automatically.
+const TILE_CHAIN: { url: string; opts: Record<string, unknown> }[] = [
+  {
+    url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+    opts: { subdomains: "abcd", maxZoom: 20, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>' },
+  },
+  {
+    url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+    opts: { maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' },
+  },
+  {
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
+    opts: { maxZoom: 19, attribution: "Tiles &copy; Esri &mdash; Esri, HERE, Garmin, OpenStreetMap contributors" },
+  },
+];
+const SAT_TILES = {
+  url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+  opts: { maxZoom: 19, attribution: "Tiles &copy; Esri &mdash; Maxar, Earthstar Geographics, and the GIS User Community" },
 };
 
 export default function NavMap({
@@ -41,21 +52,20 @@ export default function NavMap({
 }: Props) {
   const holder = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
-  const mbRef = useRef<any>(null);
-  const netDone = useRef(false);
-  const routeLayersDone = useRef(false);
-  const satActive = useRef(satellite);
-  satActive.current = satellite;
-  const markers = useRef<{ a?: any; b?: any; loc?: any }>({});
+  const LRef = useRef<any>(null);
+  const netLayers = useRef<{ paths?: any; roads?: any }>({});
+  const routeGroup = useRef<any>(null);
+  const streetLayer = useRef<any>(null);
+  const satLayer = useRef<any>(null);
+  const chainIdx = useRef(0);
   const live = useRef({ graph, start, end, route, locPos, locAcc, follow, onMapClick, onReady });
   live.current = { graph, start, end, route, locPos, locAcc, follow, onMapClick, onReady };
   const readyFired = useRef(false);
   const [mapReady, setMapReady] = useState(false);
   const [redrawTick, setRedrawTick] = useState(0);
 
-  // Merge the raw edge list into continuous polylines (paths or roads).
-  // Returns chains of [lng, lat] pairs, one array per continuous way.
-  function buildChains(g: CartGraph, wantPath: boolean): number[][][] {
+  // Merge raw edges into continuous polylines (paths or roads) -> fewer, longer lines.
+  function buildChains(L: any, g: CartGraph, wantPath: boolean) {
     const m = g.edgesA.length;
     const adj = new Map<number, [number, number][]>();
     const lonOf = (i: number) => g.nodes[i * 2 + 1];
@@ -70,13 +80,13 @@ export default function NavMap({
       adj.get(b)!.push([a, i]);
     }
     const used = new Set<number>();
-    const chains: number[][][] = [];
+    const chains: [number, number][][] = [];
     for (let seed = 0; seed < m; seed++) {
       if (used.has(seed) || (g.edgesPath[seed] === 1) !== wantPath) continue;
       used.add(seed);
       const a = g.edgesA[seed];
       const b = g.edgesB[seed];
-      const chain: number[][] = [
+      const chain: [number, number][] = [
         [lonOf(a), latOf(a)],
         [lonOf(b), latOf(b)],
       ];
@@ -116,88 +126,57 @@ export default function NavMap({
       }
       chains.push(chain);
     }
-    return chains;
+    if (!chains.length) return null;
+    return L.geoJSON(
+      {
+        type: "FeatureCollection",
+        features: chains.map((coords) => ({
+          type: "Feature",
+          properties: { c: wantPath ? 1 : 0 },
+          geometry: { type: "LineString", coordinates: coords },
+        })),
+      },
+      {
+        interactive: false,
+        style: {
+          color: wantPath ? "#1e7c66" : "#8d9a94",
+          weight: wantPath ? 3.4 : 2.4,
+          opacity: wantPath ? 0.85 : 0.55,
+        },
+      },
+    );
   }
 
-  function applyRouteData(map: any) {
-    if (!map || !map.getSource("route")) return;
-    const rt = live.current.route;
-    const features =
-      rt && rt.points.length > 1
-        ? [
-            {
-              type: "Feature",
-              properties: {},
-              geometry: { type: "LineString", coordinates: rt.points.map((p) => [p.lng, p.lat]) },
-            },
-          ]
-        : [];
-    map.getSource("route").setData({ type: "FeatureCollection", features });
-  }
-
-  // Adds network + route layers. Sources/layers are wiped by setStyle, so this
-  // runs on every style load (with the flags reset first).
-  function ensureOverlays() {
+  function drawNetwork() {
+    const L = LRef.current;
     const map = mapRef.current;
-    if (!map) return;
-    try {
-      if (!netDone.current && live.current.graph) {
-        netDone.current = true;
-        const g = live.current.graph;
-        const features: any[] = [];
-        for (const [kind, want] of [
-          ["path", true],
-          ["road", false],
-        ] as const) {
-          for (const coords of buildChains(g, want)) {
-            features.push({ type: "Feature", properties: { kind }, geometry: { type: "LineString", coordinates: coords } });
-          }
-        }
-        map.addSource("cartnet", { type: "geojson", data: { type: "FeatureCollection", features } });
-        map.addLayer({
-          id: "net-path",
-          type: "line",
-          source: "cartnet",
-          filter: ["==", ["get", "kind"], "path"],
-          layout: { "line-cap": "round", "line-join": "round" },
-          paint: { "line-color": "#1e7c66", "line-width": 3, "line-opacity": 0.9 },
-        });
-        map.addLayer({
-          id: "net-road",
-          type: "line",
-          source: "cartnet",
-          filter: ["==", ["get", "kind"], "road"],
-          layout: { "line-cap": "round", "line-join": "round" },
-          paint: { "line-color": "#8d9a94", "line-width": 2, "line-opacity": 0.65 },
-        });
-      }
-      if (!routeLayersDone.current) {
-        routeLayersDone.current = true;
-        map.addSource("route", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
-        map.addLayer({
-          id: "route-casing",
-          type: "line",
-          source: "route",
-          layout: { "line-cap": "round", "line-join": "round" },
-          paint: { "line-color": "#ffffff", "line-width": 12, "line-opacity": 0.9 },
-        });
-        map.addLayer({
-          id: "route-line",
-          type: "line",
-          source: "route",
-          layout: { "line-cap": "round", "line-join": "round" },
-          paint: { "line-color": "#1e7c66", "line-width": 5.5, "line-opacity": 0.98 },
-        });
-      }
-      // satellite raster sits under the cart network so paths stay visible.
-      if (satActive.current && !map.getLayer("sat")) {
-        map.addSource("esri", SAT_SOURCE);
-        map.addLayer({ id: "sat", type: "raster", source: "esri" }, "net-path");
-      }
-      applyRouteData(map);
-    } catch (err) {
-      console.error("overlay error", err);
+    const g = live.current.graph;
+    if (!L || !map || !g || netLayers.current.paths) return;
+    const paths = buildChains(L, g, true);
+    const roads = buildChains(L, g, false);
+    if (paths) {
+      paths.addTo(map);
+      netLayers.current.paths = paths;
     }
+    if (roads) {
+      roads.addTo(map);
+      netLayers.current.roads = roads;
+    }
+  }
+
+  // Install the street base layer, with automatic provider failover.
+  function installStreetLayer(L: any, map: any) {
+    const spec = TILE_CHAIN[chainIdx.current];
+    const layer = L.tileLayer(spec.url, spec.opts);
+    layer.on("tileerror", () => {
+      if (chainIdx.current >= TILE_CHAIN.length - 1) return;
+      chainIdx.current += 1;
+      if (map.hasLayer(streetLayer.current)) map.removeLayer(streetLayer.current);
+      streetLayer.current = installStreetLayer(L, map);
+    });
+    layer.addTo(map);
+    streetLayer.current = layer;
+    return layer;
   }
 
   // ---- init once ----
@@ -210,53 +189,29 @@ export default function NavMap({
     if (!el) return;
 
     const fixSize = () => {
-      if (mapRef.current) {
-        try {
-          mapRef.current.resize();
-        } catch {
-          /* not ready */
-        }
-      }
+      if (mapRef.current) mapRef.current.invalidateSize({ animate: false });
     };
 
     const createMap = () => {
       if (disposed || !holder.current) return;
-      void Promise.all([import("maplibre-gl"), import("maplibre-gl/dist/maplibre-gl.css")])
+      void Promise.all([import("leaflet"), import("leaflet/dist/leaflet.css")])
         .then(([Mod]) => {
           if (disposed || !holder.current) return;
-          const mb = (Mod as any).default ?? Mod;
-          mbRef.current = mb;
-          const map = new mb.Map({
-            container: holder.current,
-            style: STREET_STYLE_URL,
-            center: [-81.414, 30.095],
-            zoom: 13,
-            attributionControl: false,
-            trackResize: false,
-          });
+          const L = (Mod as any).default ?? Mod;
+          LRef.current = L;
+          const map = L.map(holder.current, {
+            zoomControl: false,
+            attributionControl: true,
+            preferCanvas: true,
+          }).setView([30.095, -81.414], 13);
           mapRef.current = map;
-          map.addControl(new mb.NavigationControl({ showCompass: false }), "bottom-right");
-          map.on("click", (e: any) => {
-            if (e && e.lngLat) {
-              live.current.onMapClick({ lat: e.lngLat.lat, lng: e.lngLat.lng });
-            }
+          L.control.zoom({ position: "bottomright" }).addTo(map);
+          map.on("click", (ev: any) => {
+            live.current.onMapClick({ lat: ev.latlng.lat, lng: ev.latlng.lng });
           });
-          map.on("load", () => {
-            if (disposed) return;
-            ensureOverlays();
-            if (!readyFired.current) {
-              readyFired.current = true;
-              live.current.onReady();
-            }
-            setMapReady(true);
-            setRedrawTick((t) => t + 1);
-          });
-          map.on("style.load", () => {
-            if (disposed) return;
-            netDone.current = false;
-            routeLayersDone.current = false;
-            ensureOverlays();
-          });
+          installStreetLayer(L, map);
+          satLayer.current = L.tileLayer(SAT_TILES.url, SAT_TILES.opts);
+          drawNetwork();
           ro = new ResizeObserver(fixSize);
           ro.observe(holder.current);
           onVis = () => {
@@ -266,9 +221,19 @@ export default function NavMap({
           window.addEventListener("pageshow", fixSize);
           window.addEventListener("resize", fixSize);
           [0, 150, 400, 900].forEach((t) => window.setTimeout(fixSize, t));
+          if (!readyFired.current) {
+            readyFired.current = true;
+            live.current.onReady();
+          }
+          setMapReady(true);
+          setRedrawTick((t) => t + 1);
         })
         .catch((err) => {
-          console.error("maplibre failed to load", err);
+          console.error("leaflet failed to load", err);
+          if (!readyFired.current) {
+            readyFired.current = true;
+            live.current.onReady();
+          }
         });
     };
 
@@ -303,73 +268,88 @@ export default function NavMap({
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapReady) return;
-    const hasSat = map.getLayer("sat") != null;
-    if (satellite && !hasSat) {
-      map.addSource("esri", SAT_SOURCE);
-      map.addLayer({ id: "sat", type: "raster", source: "esri" }, "net-path");
-    } else if (!satellite && hasSat) {
-      map.removeLayer("sat");
-      if (map.getSource("esri")) map.removeSource("esri");
+    if (satellite) {
+      if (!map.hasLayer(satLayer.current)) satLayer.current.addTo(map);
+      if (map.hasLayer(streetLayer.current)) map.removeLayer(streetLayer.current);
+    } else {
+      if (!map.hasLayer(streetLayer.current)) streetLayer.current.addTo(map);
+      if (map.hasLayer(satLayer.current)) map.removeLayer(satLayer.current);
     }
   }, [satellite, mapReady]);
 
-  // ---- graph arrives: apply network once the map style is ready ----
+  // ---- graph arrives: draw the network ----
   useEffect(() => {
-    if (!graph || !mapReady) return;
-    const map = mapRef.current;
-    if (map && map.isStyleLoaded() && !netDone.current) {
-      ensureOverlays();
-    }
+    if (!graph) return;
+    drawNetwork();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [graph, mapReady]);
+  }, [graph]);
 
   // ---- markers + route + fit ----
   useEffect(() => {
+    const L = LRef.current;
     const map = mapRef.current;
-    const mb = mbRef.current;
-    if (!map || !mb || !mapReady) return;
-
-    const setMarker = (key: "a" | "b" | "loc", lngLat: MapPoint | null, html: string) => {
-      const existed = markers.current[key];
-      if (!lngLat) {
-        if (existed) {
-          existed.remove();
-          markers.current[key] = undefined;
-        }
-        return;
-      }
-      if (existed) {
-        existed.setLngLat([lngLat.lng, lngLat.lat]);
-      } else {
-        const el = document.createElement("div");
-        el.innerHTML = html;
-        markers.current[key] = new mb.Marker({ element: el.firstElementChild as HTMLElement, anchor: "center" })
-          .setLngLat([lngLat.lng, lngLat.lat])
-          .addTo(map);
-      }
+    if (!L || !map || !mapReady) return;
+    if (routeGroup.current) {
+      map.removeLayer(routeGroup.current);
+      routeGroup.current = null;
+    }
+    const group = L.layerGroup();
+    const { start: st, end: en, route: rt, locPos: lp, locAcc: ac } = live.current;
+    const mk = (lat: number, lng: number, letter: string, cls: string) => {
+      const icon = L.divIcon({
+        className: "",
+        html: `<div class="cn-marker ${cls}">${letter}</div>`,
+        iconSize: [26, 26],
+        iconAnchor: [13, 13],
+      });
+      return L.marker([lat, lng], { icon, interactive: false });
     };
-
-    const { start: st, end: en, locPos: lp, locAcc: ac } = live.current;
-    setMarker("a", st, `<div class="cn-marker cn-marker-start">A</div>`);
-    setMarker("b", en, `<div class="cn-marker cn-marker-end">B</div>`);
-    setMarker("loc", lp, `<div class="cn-locdot" style="--acc:${Math.max(ac ?? 12, 8)}px"></div>`);
-    applyRouteData(map);
-
-    const pts: number[][] = [];
-    if (st) pts.push([st.lng, st.lat]);
-    if (en) pts.push([en.lng, en.lat]);
-    const rt = live.current.route;
+    if (st) group.addLayer(mk(st.lat, st.lng, "A", "cn-marker-start"));
+    if (en) group.addLayer(mk(en.lat, en.lng, "B", "cn-marker-end"));
+    if (lp) {
+      const ring = L.circle([lp.lat, lp.lng], {
+        radius: Math.max(ac ?? 12, 8),
+        color: "#2fae9a",
+        weight: 1,
+        opacity: 0.4,
+        fillColor: "#2fae9a",
+        fillOpacity: 0.1,
+        interactive: false,
+      });
+      const dot = L.circleMarker([lp.lat, lp.lng], {
+        radius: 8,
+        color: "#ffffff",
+        weight: 3,
+        fillColor: "#0e7c66",
+        fillOpacity: 1,
+        interactive: false,
+      });
+      group.addLayer(ring);
+      group.addLayer(dot);
+    }
     if (rt && rt.points.length > 1) {
-      pts.push([rt.points[0].lng, rt.points[0].lat]);
-      pts.push([rt.points[rt.points.length - 1].lng, rt.points[rt.points.length - 1].lat]);
+      const ll = rt.points.map((p) => [p.lat, p.lng]);
+      const casing = L.polyline(ll, { color: "#ffffff", weight: 12, opacity: 0.9, interactive: false });
+      const line = L.polyline(ll, { color: "#1e7c66", weight: 5.5, opacity: 0.98, interactive: false });
+      casing.addTo(group);
+      line.addTo(group);
     }
-    if (pts.length >= 2) {
-      map.fitBounds(pts, { padding: 60, maxZoom: 15, duration: 250 });
-    } else if (pts.length === 1 && !locPos) {
-      map.jumpTo({ center: pts[0], zoom: 15 });
+    group.addTo(map);
+    routeGroup.current = group;
+
+    const bounds: any[] = [];
+    if (st) bounds.push([st.lat, st.lng]);
+    if (en) bounds.push([en.lat, en.lng]);
+    if (rt && rt.points.length > 1) {
+      bounds.push([rt.points[0].lat, rt.points[0].lng]);
+      bounds.push([rt.points[rt.points.length - 1].lat, rt.points[rt.points.length - 1].lng]);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [start, end, route, locPos, locAcc, redrawTick, mapReady]);
+    if (bounds.length >= 2) {
+      map.fitBounds(L.latLngBounds(bounds), { padding: [46, 46], maxZoom: 15 });
+    } else if (bounds.length === 1 && !locPos) {
+      map.setView([bounds[0][0], bounds[0][1]], 15);
+    }
+  }, [start, end, route, locPos, locAcc, redrawTick]);
 
   // ---- live follow ----
   useEffect(() => {
@@ -378,7 +358,7 @@ export default function NavMap({
     const lp = live.current.locPos;
     const f = live.current.follow;
     if (lp && f) {
-      map.jumpTo({ center: [lp.lng, lp.lat], zoom: Math.max(map.getZoom(), 15) });
+      map.setView([lp.lat, lp.lng], Math.max(map.getZoom(), 15), { animate: true });
     }
   }, [locPos, follow, mapReady]);
 
