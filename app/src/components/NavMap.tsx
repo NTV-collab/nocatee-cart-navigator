@@ -14,6 +14,8 @@ type Props = {
   satellite: boolean;
   evOverlay: boolean;
   evOpacity: number;
+  trails: { id: number; geom: [number, number][] }[];
+  draftPoints: MapPoint[];
   onToggleSatellite: () => void;
   onMapClick: (p: MapPoint) => void;
   onReady: () => void;
@@ -52,6 +54,8 @@ export default function NavMap({
   satellite,
   evOverlay,
   evOpacity,
+  trails,
+  draftPoints,
   onMapClick,
   onReady,
 }: Props) {
@@ -67,6 +71,7 @@ export default function NavMap({
   const overlayLayer = useRef<any>(null);
   const overlayBounds = useRef<any>(null);
   const overlayDrag = useRef<any>(null);
+  const trailsGroup = useRef<any>(null);
   const live = useRef({ graph, start, end, route, locPos, locAcc, follow, onMapClick, onReady });
   live.current = { graph, start, end, route, locPos, locAcc, follow, onMapClick, onReady };
   const readyFired = useRef(false);
@@ -377,6 +382,39 @@ export default function NavMap({
       if (map.hasLayer(satLayer.current)) map.removeLayer(satLayer.current);
     }
   }, [satellite, mapReady]);
+
+  // ---- user-drawn trails + draft rendering ----
+  useEffect(() => {
+    const L = LRef.current;
+    const map = mapRef.current;
+    if (!L || !map || !mapReady) return;
+    if (trailsGroup.current) {
+      map.removeLayer(trailsGroup.current);
+      trailsGroup.current = null;
+    }
+    const g = L.layerGroup();
+    for (const t of trails) {
+      if (!t.geom || t.geom.length < 2) continue;
+      g.addLayer(
+        L.polyline(t.geom.map((c) => [c[0], c[1]]), {
+          color: "#2f8b4e",
+          weight: 7,
+          opacity: 0.95,
+          interactive: false,
+        }),
+      );
+    }
+    if (draftPoints && draftPoints.length > 1) {
+      g.addLayer(
+        L.polyline(
+          draftPoints.map((p) => [p.lat, p.lng]),
+          { color: "#2f8b4e", weight: 7, opacity: 0.5, dashArray: "6 8", interactive: false },
+        ),
+      );
+    }
+    g.addTo(map);
+    trailsGroup.current = g;
+  }, [trails, draftPoints, mapReady]);
 
   // ---- graph arrives: draw the network ----
   useEffect(() => {

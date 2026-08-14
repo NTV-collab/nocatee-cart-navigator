@@ -133,6 +133,43 @@ export class CartRouter {
     };
   }
 
+  // Add an externally drawn trail (user-drawn legal path) to the routable
+  // network: snap to nearby nodes where possible, else create new nodes.
+  addExternalTrail(coords: [number, number][], name = "Drawn Trail") {
+    const hav = (la1: number, lo1: number, la2: number, lo2: number) => {
+      const dLat = ((la2 - la1) * Math.PI) / 180;
+      const dLon = ((lo2 - lo1) * Math.PI) / 180;
+      const s = Math.sin(dLat / 2) ** 2 + Math.cos((la1 * Math.PI) / 180) * Math.cos((la2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+      return 2 * 6371000 * Math.asin(Math.sqrt(s));
+    };
+    let nameIdx = -1;
+    if (name) {
+      if (!this.g.names.includes(name)) this.g.names.push(name);
+      nameIdx = this.g.names.indexOf(name);
+    }
+    const idxs: number[] = [];
+    for (const [la, lo] of coords) {
+      const n = this.nearest(la, lo);
+      const d = Math.sqrt((this.lat(n) - la) ** 2 + (this.lng(n) - lo) ** 2) * 111000;
+      let key = n;
+      if (d > 40) {
+        key = this.g.nodes.length / 2;
+        this.g.nodes.push(la, lo);
+        this.adj.push([]);
+      }
+      if (idxs.length && idxs[idxs.length - 1] === key) continue;
+      idxs.push(key);
+    }
+    for (let i = 0; i < idxs.length - 1; i++) {
+      const a = idxs[i];
+      const b = idxs[i + 1];
+      if (a === b) continue;
+      const w = Math.max(1, Math.round(hav(this.lat(a), this.lng(a), this.lat(b), this.lng(b))));
+      this.adj[a].push({ to: b, w, nameIdx, path: true });
+      this.adj[b].push({ to: a, w, nameIdx, path: true });
+    }
+  }
+
   private buildSteps(nodePath: number[]): RouteStep[] {
     const g = this.g;
     const segs: { a: number; b: number; w: number; name: string; path: boolean }[] = [];

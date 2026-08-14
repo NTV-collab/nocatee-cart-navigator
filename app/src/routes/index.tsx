@@ -4,6 +4,7 @@ import { loadCartGraph, type CartGraph } from "../lib/cart-data";
 import { CartRouter, type RouteResult, type MapPoint } from "../lib/cart-core";
 import { DESTINATIONS, type Destination } from "../lib/destinations";
 import NavMap from "../components/NavMap";
+import { listTrails, saveTrail } from "../lib/api/trails.functions";
 
 export const Route = createFileRoute("/")({
   component: Index,
@@ -34,6 +35,10 @@ function Index() {
   const [evOverlay, setEvOverlay] = useState(false);
   const [evOpacity, setEvOpacity] = useState(0.55);
   const [driving, setDriving] = useState(false);
+  const [drawing, setDrawing] = useState(false);
+  const [draft, setDraft] = useState<MapPoint[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [trails, setTrails] = useState<{ id: number; geom: [number, number][] }[]>([]);
   const locWatch = useRef<number | null>(null);
   const trackingRef = useRef(false);
   trackingRef.current = tracking;
@@ -59,6 +64,32 @@ function Index() {
   useEffect(() => {
     const t = window.setTimeout(() => setReady(true), 5000);
     return () => window.clearTimeout(t);
+  }, []);
+
+  // load community-drawn trails and make them routable
+  useEffect(() => {
+    let alive = true;
+    listTrails()
+      .then(({ trails: rows }) => {
+        if (!alive) return;
+        const parsed: { id: number; geom: [number, number][] }[] = [];
+        for (const r of rows) {
+          try {
+            const g: unknown = JSON.parse(r.geom);
+            if (Array.isArray(g) && g.length > 1 && Array.isArray(g[0])) {
+              parsed.push({ id: r.id, geom: g as [number, number][] });
+            }
+          } catch {}
+        }
+        setTrails(parsed);
+        for (const t of parsed) {
+          routerRef.current?.addExternalTrail(t.geom);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
   }, []);
 
   // stop live tracking when the page unmounts
@@ -119,6 +150,10 @@ function Index() {
 
   const onMapClick = useCallback(
     (p: MapPoint) => {
+      if (drawing) {
+        setDraft((prev) => [...prev, p]);
+        return;
+      }
       if (driving) return; // route is locked while driving
       if (pickMode === "start") {
         setStart(p);
@@ -128,7 +163,7 @@ function Index() {
         if (!start) setPickMode("start"); // next tap sets the start
       }
     },
-    [pickMode, start, driving],
+    [pickMode, start, driving, drawing],
   );
 
   const locateMe = useCallback(() => {
@@ -220,6 +255,21 @@ function Index() {
     setTracking(false);
   }, []);
 
+  const saveDraft = useCallback(async () => {
+    if (draft.length < 2) return;
+    setSaving(true);
+    try {
+      const geo = draft.map((p) => [p.lat, p.lng]) as [number, number][];
+      await saveTrail({ data: { geom: JSON.stringify(geo) } });
+      routerRef.current?.addExternalTrail(geo);
+      setTrails((prev) => [...prev, { id: Date.now(), geom: geo }]);
+      setDraft([]);
+      setDrawing(false);
+    } finally {
+      setSaving(false);
+    }
+  }, [draft]);
+
   const filtered = search.trim()
     ? DESTINATIONS.filter((d) => (d.name + " " + d.sub).toLowerCase().includes(search.trim().toLowerCase()))
     : DESTINATIONS;
@@ -274,6 +324,8 @@ function Index() {
         satellite={satellite}
         evOverlay={evOverlay}
         evOpacity={evOpacity}
+        trails={trails}
+        draftPoints={draft}
         onToggleSatellite={() => setSatellite((v) => !v)}
         onMapClick={onMapClick}
         onReady={() => setReady(true)}
@@ -389,6 +441,47 @@ function Index() {
             >
               {crosshairIcon}
             </button>
+            <button
+              onClick={() => setDrawing((v) => !v)}
+              title={drawing ? "Stop drawing" : "Draw a trail"}
+              aria-label={drawing ? "Stop drawing" : "Draw a trail"}
+              className={
+                "grid size-11 place-items-center rounded-full border shadow-md transition active:scale-95 " +
+                (drawing ? "border-cn-ink bg-cn-ink text-white" : "border-cn-line bg-white/95 text-cn-ink-soft hover:text-cn-teal-deep")
+              }
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M3 17l10.5-10.5a2.1 2.1 0 0 1 3 3L6 20H3v-3Z" />
+                <path d="m13.5 6.5 3 3" />
+              </svg>
+            </button>
+            {drawing && (
+              <div className="flex flex-col items-end gap-1.5 rounded-xl border border-cn-line bg-white/95 p-2 shadow-md">
+                <span className="font-mono text-[9px] uppercase tracking-wide text-cn-ink-soft">
+                  Drawing trail ({draft.length} pts)
+                </span>
+                <button
+                  onClick={() => saveDraft()}
+                  disabled={draft.length < 2 || saving}
+                  className="rounded-full bg-cn-teal px-3 py-1.5 text-[12px] font-semibold text-white disabled:opacity-40"
+                >
+                  {saving ? "Saving..." : "Save trail"}
+                </button>
+                <button
+                  onClick={() => setDraft((prev) => prev.slice(0, -1))}
+                  disabled={!draft.length}
+                  className="text-[11px] font-medium text-cn-ink-soft underline underline-offset-2 disabled:opacity-40"
+                >
+                  Undo point
+                </button>
+                <button
+                  onClick={() => { setDraft([]); setDrawing(false); }}
+                  className="text-[11px] font-medium text-cn-clay underline underline-offset-2"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
             <button
               onClick={() => setSatellite((v) => !v)}
               title={satellite ? "Show street map" : "Show satellite view"}
