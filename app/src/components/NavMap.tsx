@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CartGraph } from "../lib/cart-data";
 import type { RouteResult, MapPoint } from "../lib/cart-core";
 
@@ -26,6 +26,10 @@ export default function NavMap({ graph, start, end, route, pickMode, locPos, loc
   const live = useRef({ graph, start, end, route, pickMode, locPos, locAcc, follow, onMapClick, onReady });
   live.current = { graph, start, end, route, pickMode, locPos, locAcc, follow, onMapClick, onReady };
   const readyFired = useRef(false);
+  const [satellite, setSatellite] = useState(false);
+  const [mapReady, setMapReady] = useState(false);
+  const baseStreet = useRef<any>(null);
+  const baseSat = useRef<any>(null);
 
   // Merge the raw edge list into continuous polylines (paths or roads).
   // This turns roughly 7,000 tiny line features into ~1,000 smooth ones,
@@ -153,12 +157,18 @@ export default function NavMap({ graph, start, end, route, pickMode, locPos, loc
           zoomControl: false,
           attributionControl: true,
           preferCanvas: true,
-        }).setView([30.095, -81.412], 12);
-        L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
-          maxZoom: 19,
+        }).setView([30.095, -81.414], 13);
+        // Google-Maps-style street basemap (CARTO Voyager) + Esri satellite
+        baseStreet.current = L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+          maxZoom: 20,
           attribution:
             '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-        }).addTo(map);
+        });
+        baseStreet.current.addTo(map);
+        baseSat.current = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+          maxZoom: 19,
+          attribution: "Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community",
+        });
         L.control.zoom({ position: "bottomright" }).addTo(map);
         map.on("click", (ev: any) => {
           live.current.onMapClick({ lat: ev.latlng.lat, lng: ev.latlng.lng });
@@ -179,6 +189,7 @@ export default function NavMap({ graph, start, end, route, pickMode, locPos, loc
           readyFired.current = true;
           live.current.onReady();
         }
+        setMapReady(true);
       })
       .catch((err) => {
         console.error("leaflet failed to load", err);
@@ -193,6 +204,20 @@ export default function NavMap({ graph, start, end, route, pickMode, locPos, loc
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ---- street / satellite toggle ----
+  useEffect(() => {
+    const L = LRef.current;
+    const map = mapRef.current;
+    if (!L || !map || !mapReady) return;
+    if (satellite) {
+      if (!map.hasLayer(baseSat.current)) baseSat.current.addTo(map);
+      if (map.hasLayer(baseStreet.current)) map.removeLayer(baseStreet.current);
+    } else {
+      if (!map.hasLayer(baseStreet.current)) baseStreet.current.addTo(map);
+      if (map.hasLayer(baseSat.current)) map.removeLayer(baseSat.current);
+    }
+  }, [satellite, mapReady]);
 
   // ---- graph arrives: draw the network ----
   useEffect(() => {
@@ -279,5 +304,17 @@ export default function NavMap({ graph, start, end, route, pickMode, locPos, loc
     }
   }, [locPos, follow]);
 
-  return <div ref={holder} className="h-full w-full" aria-label="Nocatee cart path map" />;
+  return (
+    <div className="relative h-full w-full">
+      <div ref={holder} className="h-full w-full" aria-label="Nocatee cart path map" />
+      <button
+        onClick={() => setSatellite((v) => !v)}
+        title={satellite ? "Show street map" : "Show satellite view"}
+        aria-label={satellite ? "Show street map" : "Show satellite view"}
+        className="absolute left-3 top-3 z-[500] rounded-full border border-cn-line bg-white/95 px-3.5 py-2 font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-cn-ink-soft shadow-md transition hover:text-cn-teal-deep active:scale-95"
+      >
+        {satellite ? "Map" : "Satellite"}
+      </button>
+    </div>
+  );
 }
