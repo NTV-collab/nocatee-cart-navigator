@@ -23,17 +23,16 @@ export default function NavMap({ graph, start, end, route, pickMode, locPos, loc
   const LRef = useRef<any>(null);
   const netLayers = useRef<{ paths?: any; roads?: any }>({});
   const routeGroup = useRef<any>(null);
+  const baseStreet = useRef<any>(null);
+  const baseSat = useRef<any>(null);
+  const fallbackTried = useRef(false);
   const live = useRef({ graph, start, end, route, pickMode, locPos, locAcc, follow, onMapClick, onReady });
   live.current = { graph, start, end, route, pickMode, locPos, locAcc, follow, onMapClick, onReady };
   const readyFired = useRef(false);
   const [satellite, setSatellite] = useState(false);
   const [mapReady, setMapReady] = useState(false);
-  const baseStreet = useRef<any>(null);
-  const baseSat = useRef<any>(null);
 
   // Merge the raw edge list into continuous polylines (paths or roads).
-  // This turns roughly 7,000 tiny line features into ~1,000 smooth ones,
-  // which is what keeps pan and zoom responsive on phones.
   function buildChains(L: any, g: CartGraph, wantPath: boolean) {
     const m = g.edgesA.length;
     const adj = new Map<number, [number, number][]>();
@@ -143,63 +142,107 @@ export default function NavMap({ graph, start, end, route, pickMode, locPos, loc
     apply();
   }
 
-  // ---- init the map once ----
+  // ---- init the map once, only once the container actually has size ----
   useEffect(() => {
     let disposed = false;
     let map: any = null;
     let ro: ResizeObserver | null = null;
-    void import("leaflet")
-      .then((Mod) => {
-        if (disposed || !holder.current) return;
-        const L = (Mod as any).default ?? Mod;
-        LRef.current = L;
-        map = L.map(holder.current, {
-          zoomControl: false,
-          attributionControl: true,
-          preferCanvas: true,
-        }).setView([30.095, -81.414], 13);
-        // Google-Maps-style street basemap (CARTO Voyager) + Esri satellite
-        baseStreet.current = L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
-          maxZoom: 20,
-          attribution:
-            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-        });
-        baseStreet.current.addTo(map);
-        baseSat.current = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
-          maxZoom: 19,
-          attribution: "Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community",
-        });
-        L.control.zoom({ position: "bottomright" }).addTo(map);
-        map.on("click", (ev: any) => {
-          live.current.onMapClick({ lat: ev.latlng.lat, lng: ev.latlng.lng });
-        });
-        mapRef.current = map;
-        // The container can have a wrong (zero) size on first mount while the
-        // layout settles; re-measure so the full tile grid fills the well.
-        const fixSize = () => {
-          if (mapRef.current && holder.current) {
-            mapRef.current.invalidateSize();
+    let attempts = 0;
+    const el = holder.current;
+    if (!el) return;
+
+    const fixSize = () => {
+      if (mapRef.current) mapRef.current.invalidateSize({ animate: false });
+    };
+
+    const createMap = () => {
+      if (disposed || !holder.current) return;
+      void import("leaflet")
+        .then((Mod) => {
+          if (disposed || !holder.current) return;
+          const L = (Mod as any).default ?? Mod;
+          LRef.current = L;
+          map = L.map(holder.current, {
+            zoomControl: false,
+            attributionControl: true,
+            preferCanvas: true,
+            zoomAnimation: false,
+            fadeAnimation: false,
+            markerZoomAnimation: false,
+          }).setView([30.095, -81.414], 13);
+
+          // Primary: Google-Maps-style street style (CARTO Voyager).
+          baseStreet.current = L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+            maxZoom: 20,
+            attribution:
+              '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+          });
+          baseStreet.current.addTo(map);
+          // If a tile fails to load (blocked or flaky network), fall back to
+          // OpenStreetMap's own servers so the map always fills the screen.
+          baseStreet.current.on("tileerror", () => {
+            if (fallbackTried.current || !mapRef.current) return;
+            fallbackTried.current = true;
+            const L2 = LRef.current;
+            const m2 = mapRef.current;
+            if (!L2 || !m2) return;
+            const osm = L2.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+              maxZoom: 19,
+              attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            });
+            m2.removeLayer(baseStreet.current);
+            baseStreet.current = osm;
+            osm.addTo(m2);
+          });
+
+          baseSat.current = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+            maxZoom: 19,
+            attribution: "Tiles &copy; Esri, Maxar, Earthstar Geographics, and the GIS User Community",
+          });
+
+          L.control.zoom({ position: "bottomright" }).addTo(map);
+          map.on("click", (ev: any) => {
+            live.current.onMapClick({ lat: ev.latlng.lat, lng: ev.latlng.lng });
+          });
+          mapRef.current = map;
+
+          // Re-measure several times after mount: the container can be mid-layout
+          // when the worker lands, and a single check can fire too early.
+          [0, 150, 400, 800, 1500].forEach((t) => window.setTimeout(fixSize, t));
+          ro = new ResizeObserver(fixSize);
+          if (holder.current) ro.observe(holder.current);
+          window.addEventListener("resize", fixSize);
+
+          drawNetwork();
+          if (!readyFired.current) {
+            readyFired.current = true;
+            live.current.onReady();
           }
-        };
-        ro = new ResizeObserver(fixSize);
-        ro.observe(holder.current);
-        window.setTimeout(fixSize, 120);
-        drawNetwork();
-        if (!readyFired.current) {
-          readyFired.current = true;
-          live.current.onReady();
-        }
-        setMapReady(true);
-      })
-      .catch((err) => {
-        console.error("leaflet failed to load", err);
-      });
+          setMapReady(true);
+        })
+        .catch((err) => {
+          console.error("leaflet failed to load", err);
+        });
+    };
+
+    const waitForSize = () => {
+      if (disposed) return;
+      const w = el.offsetWidth;
+      const h = el.offsetHeight;
+      if ((w > 60 && h > 60) || attempts >= 8) {
+        createMap();
+      } else {
+        attempts += 1;
+        window.setTimeout(waitForSize, 80);
+      }
+    };
+    waitForSize();
+
     return () => {
       disposed = true;
       if (ro) ro.disconnect();
-      if (map) {
-        map.remove();
-      }
+      window.removeEventListener("resize", fixSize);
+      if (map) map.remove();
       mapRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -294,7 +337,7 @@ export default function NavMap({ graph, start, end, route, pickMode, locPos, loc
     }
   }, [start, end, route, locPos, locAcc]);
 
-  // ---- live follow: keep the viewport on the location ----
+  // ---- live follow ----
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
