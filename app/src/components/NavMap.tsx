@@ -69,7 +69,7 @@ export default function NavMap({
   const holder = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const LRef = useRef<any>(null);
-  const netLayers = useRef<{ paths?: any; roads?: any }>({});
+  const netLayers = useRef<{ paths?: any; roads?: any; crossings?: any }>({});
   const routeGroup = useRef<any>(null);
   const streetLayer = useRef<any>(null);
   const satLayer = useRef<any>(null);
@@ -162,6 +162,45 @@ export default function NavMap({
     );
   }
 
+  // Roadway-crossing warnings: wherever a cart path joins a street-level way.
+  function buildCrossings(L: any, g: CartGraph) {
+    const m = g.edgesA.length;
+    const role = new Map<number, { path: boolean; road: boolean }>();
+    for (let i = 0; i < m; i++) {
+      const r = [g.edgesA[i], g.edgesB[i]];
+      for (const n of r) {
+        if (!role.has(n)) role.set(n, { path: false, road: false });
+        if (g.edgesPath[i] === 1) role.get(n)!.path = true;
+        else role.get(n)!.road = true;
+      }
+    }
+    const crossings: [number, number][] = [];
+    for (const [n, r] of role) {
+      if (r.path && r.road) {
+        crossings.push([g.nodes[n * 2 + 1], g.nodes[n * 2]]);
+      }
+    }
+    // keep the set bounded; one marker per ~120m cell
+    const seen = new Set<string>();
+    const out: [number, number][] = [];
+    for (const [x, y] of crossings) {
+      const key = (Math.round(x / 0.0016) * 1000) + "_" + (Math.round(y / 0.0016) * 1000);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push([x, y]);
+      if (out.length >= 70) break;
+    }
+    if (!out.length) return null;
+    return L.layerGroup(
+      out.map(([lonf, lat]) => {
+        const el = document.createElement("div");
+        el.className = "cn-cross";
+        el.textContent = "!";
+        return L.marker([lat, lonf], { icon: L.divIcon({ className: "", html: el.outerHTML, iconSize: [20, 20], iconAnchor: [10, 10] }), interactive: false, zIndexOffset: 500 });
+      }),
+    );
+  }
+
   function drawNetwork() {
     const L = LRef.current;
     const map = mapRef.current;
@@ -176,6 +215,11 @@ export default function NavMap({
     if (roads) {
       roads.addTo(map);
       netLayers.current.roads = roads;
+    }
+    const cross = buildCrossings(L, g);
+    if (cross) {
+      cross.addTo(map);
+      netLayers.current.crossings = cross;
     }
   }
 

@@ -253,3 +253,19 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .cn-cart::before { animation: none; }
 }
+
+/* roadway crossing warning (per official EV map) */
+.cn-cross {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 9999px;
+  background: #f08c1e;
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 5px rgb(20 43 43 / 0.4);
+}
