@@ -190,16 +190,6 @@ export default function NavMap({
     if (paths) {
       paths.addTo(map);
       netLayers.current.paths = paths;
-      try {
-        paths.eachLayer((ly: any) => {
-          const nm = ly.feature?.properties?.name;
-          if (!nm) return;
-          const raw = ly.getLatLngs();
-          const flat = Array.isArray(raw) ? raw.flat(Infinity) : raw;
-          const mid = flat && flat.length ? flat[Math.floor(flat.length / 2)] : null;
-          if (mid) ly.bindTooltip(nm, { permanent: true, direction: "center", className: "cn-trail-label", opacity: 0.95 });
-        });
-      } catch {}
     }
     if (roads) {
       roads.addTo(map);
@@ -418,8 +408,6 @@ export default function NavMap({
         opacity: 0.9,
         interactive: false,
       });
-      const nm = (t as any).name || "Greenway";
-      pl.bindTooltip(nm, { permanent: true, direction: "center", className: "cn-trail-label-sm", opacity: 1 });
       g.addLayer(pl);
     }
     if (draftPoints && draftPoints.length > 1) {
