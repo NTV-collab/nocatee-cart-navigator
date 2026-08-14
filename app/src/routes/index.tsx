@@ -118,10 +118,15 @@ function Index() {
   const onMapClick = useCallback(
     (p: MapPoint) => {
       if (driving) return; // route is locked while driving
-      if (pickMode === "start") setStart(p);
-      else setEnd(p);
+      if (pickMode === "start") {
+        setStart(p);
+        setPickMode("end"); // next tap sets the destination
+      } else {
+        setEnd(p);
+        if (!start) setPickMode("start"); // next tap sets the start
+      }
     },
-    [pickMode, driving],
+    [pickMode, start, driving],
   );
 
   const locateMe = useCallback(() => {
@@ -173,9 +178,11 @@ function Index() {
       if (t === "start") {
         setStart(pt);
         setSearchTarget("end");
+        setPickMode("end");
       } else {
         setEnd(pt);
         setSearchTarget("start");
+        setPickMode("start");
         if (!start) locateMe();
       }
       setSearch("");
