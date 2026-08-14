@@ -17,6 +17,8 @@ type Props = {
   onReady: () => void;
 };
 
+const CART_GLYPH = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="9.5" width="12" height="5.5" rx="1.6"/><path d="M9.5 9.5V6.2h4.6a1.9 1.9 0 0 1 1.9 1.9v1.4"/><path d="M10.5 6.2 9.8 4.6"/><circle cx="7.2" cy="16.2" r="1.5"/><circle cx="13.8" cy="16.2" r="1.5"/><path d="M17.5 8h1.8a1 1 0 0 1 1 1v3.4"/></svg>`;
+
 // Raster tile chain: plain <img> tiles, no WebGL, no workers. If a provider
 // fails to deliver, we swap to the next one automatically.
 const TILE_CHAIN: { url: string; opts: Record<string, unknown> }[] = [
@@ -316,16 +318,17 @@ export default function NavMap({
         fillOpacity: 0.1,
         interactive: false,
       });
-      const dot = L.circleMarker([lp.lat, lp.lng], {
-        radius: 8,
-        color: "#ffffff",
-        weight: 3,
-        fillColor: "#0e7c66",
-        fillOpacity: 1,
+      const cart = L.marker([lp.lat, lp.lng], {
+        icon: L.divIcon({
+          className: "",
+          html: `<div class="cn-cart">${CART_GLYPH}</div>`,
+          iconSize: [38, 38],
+          iconAnchor: [19, 19],
+        }),
         interactive: false,
       });
       group.addLayer(ring);
-      group.addLayer(dot);
+      group.addLayer(cart);
     }
     if (rt && rt.points.length > 1) {
       const ll = rt.points.map((p) => [p.lat, p.lng]);
