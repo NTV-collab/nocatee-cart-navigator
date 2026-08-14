@@ -17,14 +17,20 @@ type Props = {
   onReady: () => void;
 };
 
-// CARTO free vector basemap (Google-Maps style, no API key needed).
-const STREET_STYLE_URL = "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json";
-const SAT_SOURCE: any = {
-  type: "raster",
-  tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
-  tileSize: 256,
-  maxzoom: 19,
-  attribution: "Esri, Maxar, Earthstar Geographics, and the GIS User Community",
+// CARTO free vector basemap (Google-Maps style, no API key).
+const STYLE_STREET = "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json";
+const SAT_STYLE: any = {
+  version: 8,
+  sources: {
+    esri: {
+      type: "raster",
+      tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
+      tileSize: 256,
+      maxzoom: 19,
+      attribution: "Esri, Maxar, Earthstar Geographics, and the GIS User Community",
+    },
+  },
+  layers: [{ id: "sat", type: "raster", source: "esri" }],
 };
 
 export default function NavMap({
@@ -32,6 +38,7 @@ export default function NavMap({
   start,
   end,
   route,
+  pickMode,
   locPos,
   locAcc,
   follow,
@@ -44,11 +51,9 @@ export default function NavMap({
   const mbRef = useRef<any>(null);
   const netDone = useRef(false);
   const routeLayersDone = useRef(false);
-  const satActive = useRef(satellite);
-  satActive.current = satellite;
   const markers = useRef<{ a?: any; b?: any; loc?: any }>({});
-  const live = useRef({ graph, start, end, route, locPos, locAcc, follow, onMapClick, onReady });
-  live.current = { graph, start, end, route, locPos, locAcc, follow, onMapClick, onReady };
+  const live = useRef({ graph, start, end, route, locPos, follow, onMapClick, onReady });
+  live.current = { graph, start, end, route, locPos, follow, onMapClick, onReady };
   const readyFired = useRef(false);
   const [mapReady, setMapReady] = useState(false);
   const [redrawTick, setRedrawTick] = useState(0);
@@ -119,85 +124,78 @@ export default function NavMap({
     return chains;
   }
 
+  function ensureOverlays() {
+    const map = mapRef.current;
+    if (!map) return;
+    // cart network (teal paths + grey streets)
+    if (!mapDone() && live.current.graph) {
+      mapDone.current = true;
+      const g = live.current.graph;
+      const features: any[] = [];
+      for (const [kind, want] of [
+        ["path", true],
+        ["road", false],
+      ] as const) {
+        for (const coords of buildChains(g, want)) {
+          features.push({
+            type: "Feature",
+            properties: { kind },
+            geometry: { type: "LineString", coordinates: coords },
+          });
+        }
+      }
+      map.addSource("cartnet", { type: "geojson", data: { type: "FeatureCollection", features } });
+      map.addLayer({
+        id: "net-path",
+        type: "line",
+        source: "cartnet",
+        filter: ["==", ["get", "kind"], "path"],
+        layout: { "line-cap": "round", "line-join": "round" },
+        paint: { "line-color": "#1e7c66", "line-width": 3, "line-opacity": 0.9 },
+      });
+      map.addLayer({
+        id: "net-road",
+        type: "line",
+        source: "cartnet",
+        filter: ["==", ["get", "kind"], "road"],
+        layout: { "line-cap": "round", "line-join": "round" },
+        paint: { "line-color": "#8d9a94", "line-width": 2, "line-opacity": 0.6 },
+      });
+    }
+    // route layers (created once, data swapped later)
+    if (!routeLayersDone.current) {
+      routeLayersDone.current = true;
+      map.addSource("route", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+      map.addLayer({
+        id: "route-casing",
+        type: "line",
+        source: "route",
+        layout: { "line-cap": "round", "line-join": "round" },
+        paint: { "line-color": "#ffffff", "line-width": 12, "line-opacity": 0.9 },
+      });
+      map.addLayer({
+        id: "route-line",
+        type: "line",
+        source: "route",
+        layout: { "line-cap": "round", "line-join": "round" },
+        paint: { "line-color": "#1e7c66", "line-width": 5.5, "line-opacity": 0.98 },
+      });
+    }
+    applyRouteData(map);
+  }
+
+  function mapDone() {
+    return mapRef.current && mapRef.current.isStyleLoaded ? mapRef.current.isStyleLoaded() : Boolean(mapRef.current);
+  }
+
   function applyRouteData(map: any) {
     if (!map || !map.getSource("route")) return;
     const rt = live.current.route;
     const features =
       rt && rt.points.length > 1
-        ? [
-            {
-              type: "Feature",
-              properties: {},
-              geometry: { type: "LineString", coordinates: rt.points.map((p) => [p.lng, p.lat]) },
-            },
-          ]
+        ? [{ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: rt.points.map((p) => [p.lng, p.lat]) } }]
         : [];
     map.getSource("route").setData({ type: "FeatureCollection", features });
-  }
-
-  // Adds network + route layers. Sources/layers are wiped by setStyle, so this
-  // runs on every style load (with the flags reset first).
-  function ensureOverlays() {
-    const map = mapRef.current;
-    if (!map) return;
-    try {
-      if (!netDone.current && live.current.graph) {
-        netDone.current = true;
-        const g = live.current.graph;
-        const features: any[] = [];
-        for (const [kind, want] of [
-          ["path", true],
-          ["road", false],
-        ] as const) {
-          for (const coords of buildChains(g, want)) {
-            features.push({ type: "Feature", properties: { kind }, geometry: { type: "LineString", coordinates: coords } });
-          }
-        }
-        map.addSource("cartnet", { type: "geojson", data: { type: "FeatureCollection", features } });
-        map.addLayer({
-          id: "net-path",
-          type: "line",
-          source: "cartnet",
-          filter: ["==", ["get", "kind"], "path"],
-          layout: { "line-cap": "round", "line-join": "round" },
-          paint: { "line-color": "#1e7c66", "line-width": 3, "line-opacity": 0.9 },
-        });
-        map.addLayer({
-          id: "net-road",
-          type: "line",
-          source: "cartnet",
-          filter: ["==", ["get", "kind"], "road"],
-          layout: { "line-cap": "round", "line-join": "round" },
-          paint: { "line-color": "#8d9a94", "line-width": 2, "line-opacity": 0.65 },
-        });
-      }
-      if (!routeLayersDone.current) {
-        routeLayersDone.current = true;
-        map.addSource("route", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
-        map.addLayer({
-          id: "route-casing",
-          type: "line",
-          source: "route",
-          layout: { "line-cap": "round", "line-join": "round" },
-          paint: { "line-color": "#ffffff", "line-width": 12, "line-opacity": 0.9 },
-        });
-        map.addLayer({
-          id: "route-line",
-          type: "line",
-          source: "route",
-          layout: { "line-cap": "round", "line-join": "round" },
-          paint: { "line-color": "#1e7c66", "line-width": 5.5, "line-opacity": 0.98 },
-        });
-      }
-      // satellite raster sits under the cart network so paths stay visible.
-      if (satActive.current && !map.getLayer("sat")) {
-        map.addSource("esri", SAT_SOURCE);
-        map.addLayer({ id: "sat", type: "raster", source: "esri" }, "net-path");
-      }
-      applyRouteData(map);
-    } catch (err) {
-      console.error("overlay error", err);
-    }
   }
 
   // ---- init once ----
@@ -214,7 +212,7 @@ export default function NavMap({
         try {
           mapRef.current.resize();
         } catch {
-          /* not ready */
+          /* not ready yet */
         }
       }
     };
@@ -228,7 +226,7 @@ export default function NavMap({
           mbRef.current = mb;
           const map = new mb.Map({
             container: holder.current,
-            style: STREET_STYLE_URL,
+            style: STREET_STREET,
             center: [-81.414, 30.095],
             zoom: 13,
             attributionControl: false,
@@ -252,10 +250,7 @@ export default function NavMap({
             setRedrawTick((t) => t + 1);
           });
           map.on("style.load", () => {
-            if (disposed) return;
-            netDone.current = false;
-            routeLayersDone.current = false;
-            ensureOverlays();
+            if (!disposed) ensureOverlays();
           });
           ro = new ResizeObserver(fixSize);
           ro.observe(holder.current);
@@ -288,7 +283,7 @@ export default function NavMap({
     return () => {
       disposed = true;
       if (ro) ro.disconnect();
-      if (onVis) document.removeEventListener("visibilitychange", onVis);
+      document.removeEventListener("visibilitychange", onVis ?? (() => undefined));
       window.removeEventListener("pageshow", fixSize);
       window.removeEventListener("resize", fixSize);
       if (mapRef.current) {
@@ -299,26 +294,39 @@ export default function NavMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ---- street / satellite toggle ----
+  // ---- street / satellite ----
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !mapReady) return;
-    const hasSat = map.getLayer("sat") != null;
-    if (satellite && !hasSat) {
-      map.addSource("esri", SAT_SOURCE);
-      map.addLayer({ id: "sat", type: "raster", source: "esri" }, "net-path");
-    } else if (!satellite && hasSat) {
-      map.removeLayer("sat");
-      if (map.getSource("esri")) map.removeSource("esri");
+    const mb = mbRef.current;
+    if (!map || !mb || !mapReady) return;
+    if (live.current.route && map.getLayer("route-line")) {
+      // keep overlays above the raster satellite layer
+      const hasSat = map.getLayer("sat");
+      if (satellite && !hasSat) {
+        map.addSource("esri", SATILE.sources.esri);
+        map.addLayer({ id: "sat", type: "raster", source: "esri" });
+      } else if (!satellite && hasSat) {
+        map.removeLayer("sat");
+        map.removeSource("esri");
+      }
+    } else if (satellite !== (map.getLayer("sat") != null)) {
+      if (satellite) {
+        map.addSource("esri", SATILE.sources.esri);
+        map.addLayer({ id: "sat", type: "raster", source: "esri" });
+      } else if (map.getLayer("sat")) {
+        map.removeLayer("sat");
+        map.removeSource("esri");
+      }
     }
   }, [satellite, mapReady]);
 
-  // ---- graph arrives: apply network once the map style is ready ----
+  // ---- graph arrives: draw the network ----
   useEffect(() => {
     if (!graph || !mapReady) return;
-    const map = mapRef.current;
-    if (map && map.isStyleLoaded() && !netDone.current) {
-      ensureOverlays();
+    if (mapRef.current && mapRef.current.isStyleLoaded()) {
+      if (!mapDone.current) {
+        ensureOverlays();
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [graph, mapReady]);
@@ -352,7 +360,11 @@ export default function NavMap({
     const { start: st, end: en, locPos: lp, locAcc: ac } = live.current;
     setMarker("a", st, `<div class="cn-marker cn-marker-start">A</div>`);
     setMarker("b", en, `<div class="cn-marker cn-marker-end">B</div>`);
-    setMarker("loc", lp, `<div class="cn-locdot" style="--acc:${Math.max(ac ?? 12, 8)}px"></div>`);
+    if (lp) {
+      setMarker("loc", lp, `<div class="cn-locdot" style="--acc:${Math.max(ac ?? 12, 8)}px"></div>`);
+    } else {
+      setMarker("loc", null, "");
+    }
     applyRouteData(map);
 
     const pts: number[][] = [];
@@ -365,10 +377,9 @@ export default function NavMap({
     }
     if (pts.length >= 2) {
       map.fitBounds(pts, { padding: 60, maxZoom: 15, duration: 250 });
-    } else if (pts.length === 1 && !locPos) {
+    } else if (pts.length === 1 && !lp) {
       map.jumpTo({ center: pts[0], zoom: 15 });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [start, end, route, locPos, locAcc, redrawTick, mapReady]);
 
   // ---- live follow ----

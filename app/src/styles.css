@@ -127,3 +127,30 @@ body {
     transform: translateY(0);
   }
 }
+/* MapLibre base */
+.maplibregl-map {
+  background: #dfe8e4;
+}
+
+.cn-locdot {
+  position: relative;
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background: var(--color-cn-teal);
+  border: 3px solid #fff;
+  box-shadow: 0 1px 6px rgb(20 43 43 / 0.35);
+}
+
+.cn-locdot::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: calc(var(--acc, 12px) * 2);
+  height: calc(var(--acc, 12px) * 2);
+  border-radius: 9999px;
+  background: rgb(47 174 154 / 0.18);
+  border: 1px solid rgb(47 174 154 / 0.45);
+}
