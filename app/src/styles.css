@@ -107,33 +107,9 @@ body {
   background: var(--color-cn-lagoon);
 }
 
-.route-casing {
-  stroke: #fff;
-  stroke-opacity: 0.85;
-  stroke-width: 13;
-}
-
-.route-line {
-  stroke: var(--color-cn-teal);
-  stroke-width: 5.5;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-dasharray: 1 14;
-  animation: cn-route-dash 14s linear infinite;
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .route-line {
-    animation: none;
-  }
   .cn-fade-in {
     animation: none;
-  }
-}
-
-@keyframes cn-route-dash {
-  to {
-    stroke-dashoffset: -1200;
   }
 }
 

@@ -32,6 +32,7 @@ export default function NavMap({ graph, start, end, route, pickMode, locPos, loc
   live.current = { graph, start, end, route, pickMode, locPos, locAcc, follow, onMapClick, onReady };
   const readyFired = useRef(false);
   const [mapReady, setMapReady] = useState(false);
+  const [redrawTick, setRedrawTick] = useState(0);
 
   // Merge the raw edge list into continuous polylines (paths or roads).
   function buildChains(L: any, g: CartGraph, wantPath: boolean) {
@@ -213,6 +214,11 @@ export default function NavMap({ graph, start, end, route, pickMode, locPos, loc
           ro = new ResizeObserver(fixSize);
           if (holder.current) ro.observe(holder.current);
           window.addEventListener("resize", fixSize);
+          const onVis = () => {
+            if (!document.hidden) fixSize();
+          };
+          document.addEventListener("visibilitychange", onVis);
+          window.addEventListener("pageshow", fixSize);
 
           drawNetwork();
           if (!readyFired.current) {
@@ -220,6 +226,7 @@ export default function NavMap({ graph, start, end, route, pickMode, locPos, loc
             live.current.onReady();
           }
           setMapReady(true);
+          setRedrawTick((t) => t + 1);
         })
         .catch((err) => {
           console.error("leaflet failed to load", err);
@@ -243,6 +250,8 @@ export default function NavMap({ graph, start, end, route, pickMode, locPos, loc
       disposed = true;
       if (ro) ro.disconnect();
       window.removeEventListener("resize", fixSize);
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("pageshow", fixSize);
       if (map) map.remove();
       mapRef.current = null;
     };
@@ -274,12 +283,11 @@ export default function NavMap({ graph, start, end, route, pickMode, locPos, loc
   useEffect(() => {
     const L = LRef.current;
     const map = mapRef.current;
-    if (!L || !map) return;
+    if (!L || !map || !mapReady) return;
     if (routeGroup.current) {
       map.removeLayer(routeGroup.current);
       routeGroup.current = null;
     }
-    const svg = L.svg({ padding: 0.5 });
     const group = L.layerGroup();
     const { start: st, end: en, route: rt, locPos: lp, locAcc: ac } = live.current;
     const mk = (lat: number, lng: number, letter: string, cls: string) => {
@@ -316,8 +324,8 @@ export default function NavMap({ graph, start, end, route, pickMode, locPos, loc
     }
     if (rt && rt.points.length > 1) {
       const ll = rt.points.map((p) => [p.lat, p.lng]);
-      const casing = L.polyline(ll, { color: "#ffffff", weight: 13, opacity: 0.9, interactive: false, renderer: svg });
-      const line = L.polyline(ll, { color: "#1e7c66", weight: 6, opacity: 0.95, className: "route-line", interactive: false, renderer: svg });
+      const casing = L.polyline(ll, { color: "#ffffff", weight: 12, opacity: 0.9, interactive: false });
+      const line = L.polyline(ll, { color: "#1e7c66", weight: 5.5, opacity: 0.98, interactive: false });
       casing.addTo(group);
       line.addTo(group);
     }
@@ -336,7 +344,7 @@ export default function NavMap({ graph, start, end, route, pickMode, locPos, loc
     } else if (bounds.length === 1 && !lp) {
       map.setView([bounds[0][0], bounds[0][1]], 15);
     }
-  }, [start, end, route, locPos, locAcc]);
+  }, [start, end, route, locPos, locAcc, redrawTick]);
 
   // ---- live follow ----
   useEffect(() => {
