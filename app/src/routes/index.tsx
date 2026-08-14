@@ -84,10 +84,20 @@ function Index() {
     );
   }, []);
 
-  const pickDestination = useCallback((d: Destination) => {
-    setEnd({ lat: d.lat, lng: d.lng, label: d.name });
-    setSearch("");
-  }, []);
+  const pickDestination = useCallback(
+    (d: Destination) => {
+      const pt: MapPoint = { lat: d.lat, lng: d.lng, label: d.name };
+      if (pickMode === "start") {
+        setStart(pt);
+        setPickMode("end");
+      } else {
+        setEnd(pt);
+        if (!start) setPickMode("start");
+      }
+      setSearch("");
+    },
+    [pickMode, start],
+  );
 
   const clearAll = useCallback(() => {
     setStart(null);
@@ -182,8 +192,48 @@ function Index() {
                   </button>
                 </div>
                 <p className="mt-2 text-[12px] leading-snug text-cn-ink-soft">
-                  {pickMode === "start" ? "Tap the map to mark where you start." : "Tap a destination below or on the map."}
+                  {pickMode === "start"
+                    ? "Point A is active: tap the map or pick a destination to set your start."
+                    : start
+                      ? "Point B is active: tap the map or pick a destination."
+                      : "Pick a destination, then tap the map or press Locate to set your start."}
                 </p>
+              </div>
+
+              <div className="rounded-2xl border border-cn-line bg-cn-paper p-4">
+                <label htmlFor="dest-search" className="mb-2 block font-mono text-[10px] tracking-[0.18em] text-cn-ink-soft uppercase">
+                  Find a destination
+                </label>
+                <input
+                  id="dest-search"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search parks, schools, shops..."
+                  className="h-10 w-full rounded-xl border border-cn-line bg-white px-3 text-[14px] text-cn-ink placeholder:text-cn-ink-soft/60 focus:border-cn-teal focus:outline-none"
+                />
+                {search.trim() !== "" && (
+                  <ul className="mt-2 max-h-60 overflow-y-auto rounded-xl border border-cn-line bg-white">
+                    {filtered.map((d) => (
+                      <li key={d.name}>
+                        <button
+                          onClick={() => pickDestination(d)}
+                          className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left transition hover:bg-cn-mist active:scale-[0.99]"
+                        >
+                          <span className="min-w-0">
+                            <span className="block truncate text-[13px] font-semibold text-cn-ink">{d.name}</span>
+                            <span className="block truncate text-[11px] text-cn-ink-soft">{d.sub}</span>
+                          </span>
+                          <span className="shrink-0 rounded-full bg-cn-mist px-2 py-0.5 font-mono text-[9px] uppercase tracking-wide text-cn-ink-soft">
+                            {d.zone === "west" ? "west" : d.group}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                    {filtered.length === 0 && (
+                      <li className="px-3 py-2 text-[12px] text-cn-ink-soft">No destinations match.</li>
+                    )}
+                  </ul>
+                )}
               </div>
 
               {/* route summary + steps */}
@@ -250,19 +300,13 @@ function Index() {
                 onReady={() => setReady(true)}
               />
 
-              {/* destinations chips */}
+              {/* destination chips */}
               <div className="absolute inset-x-0 bottom-0 z-[400] bg-gradient-to-t from-cn-paper via-cn-paper/95 to-transparent px-4 pt-10 pb-4">
-                <div className="mb-2 flex items-center gap-3">
-                  <p className="font-mono text-[10px] tracking-[0.18em] text-cn-ink-soft uppercase">Destinations</p>
-                  <input
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search parks, schools, shops..."
-                    className="h-8 w-48 rounded-lg border border-cn-line bg-white/90 px-3 text-[12px] text-cn-ink placeholder:text-cn-ink-soft/60 focus:border-cn-teal focus:outline-none"
-                  />
-                </div>
+                <p className="mb-2 font-mono text-[10px] tracking-[0.18em] text-cn-ink-soft uppercase">
+                  Tap a chip to set {pickMode === "start" ? "point A" : "point B"}
+                </p>
                 <div className="scrollbar-none flex gap-2 overflow-x-auto pb-1">
-                  {(search ? filtered : DESTINATIONS).map((d) => (
+                  {DESTINATIONS.map((d) => (
                     <button
                       key={d.name}
                       onClick={() => pickDestination(d)}
@@ -274,7 +318,6 @@ function Index() {
                       </span>
                     </button>
                   ))}
-                  {filtered.length === 0 && <p className="py-2 text-[12px] text-cn-ink-soft">No destinations match.</p>}
                 </div>
               </div>
             </div>

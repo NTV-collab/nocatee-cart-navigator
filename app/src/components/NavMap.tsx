@@ -12,52 +12,130 @@ type Props = {
   onReady: () => void;
 };
 
+const ROAD_MIN_ZOOM = 13.5;
+
 export default function NavMap({ graph, start, end, route, pickMode, onMapClick, onReady }: Props) {
   const holder = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const LRef = useRef<any>(null);
-  const networkLayer = useRef<any>(null);
+  const netLayers = useRef<{ paths?: any; roads?: any }>({});
   const routeGroup = useRef<any>(null);
   const live = useRef({ graph, start, end, route, pickMode, onMapClick, onReady });
   live.current = { graph, start, end, route, pickMode, onMapClick, onReady };
   const readyFired = useRef(false);
 
+  // Merge the raw edge list into continuous polylines (paths or roads).
+  // This turns roughly 7,000 tiny line features into ~1,000 smooth ones,
+  // which is what keeps pan and zoom responsive on phones.
+  function buildChains(L: any, g: CartGraph, wantPath: boolean) {
+    const m = g.edgesA.length;
+    const adj = new Map<number, [number, number][]>();
+    const lonOf = (i: number) => g.nodes[i * 2 + 1];
+    const latOf = (i: number) => g.nodes[i * 2];
+    for (let i = 0; i < m; i++) {
+      if ((g.edgesPath[i] === 1) !== wantPath) continue;
+      const a = g.edgesA[i];
+      const b = g.edgesB[i];
+      if (!adj.has(a)) adj.set(a, []);
+      if (!adj.has(b)) adj.set(b, []);
+      adj.get(a)!.push([b, i]);
+      adj.get(b)!.push([a, i]);
+    }
+    const used = new Set<number>();
+    const chains: [number, number][][] = [];
+    for (let seed = 0; seed < m; seed++) {
+      if (used.has(seed) || (g.edgesPath[seed] === 1) !== wantPath) continue;
+      used.add(seed);
+      const a = g.edgesA[seed];
+      const b = g.edgesB[seed];
+      const chain: [number, number][] = [
+        [lonOf(a), latOf(a)],
+        [lonOf(b), latOf(b)],
+      ];
+      // extend forward from b
+      let cur = b;
+      for (;;) {
+        const nbs = adj.get(cur);
+        let nxt: number | null = null;
+        if (nbs) {
+          for (const [to, j] of nbs) {
+            if (!used.has(j)) {
+              nxt = to;
+              used.add(j);
+              break;
+            }
+          }
+        }
+        if (nxt === null) break;
+        chain.push([lonOf(nxt), latOf(nxt)]);
+        cur = nxt;
+      }
+      // extend backward from a
+      cur = a;
+      for (;;) {
+        const nbs = adj.get(cur);
+        let nxt: number | null = null;
+        if (nbs) {
+          for (const [to, j] of nbs) {
+            if (!used.has(j)) {
+              nxt = to;
+              used.add(j);
+              break;
+            }
+          }
+        }
+        if (nxt === null) break;
+        chain.unshift([lonOf(nxt), latOf(nxt)]);
+        cur = nxt;
+      }
+      chains.push(chain);
+    }
+    if (!chains.length) return null;
+    return L.geoJSON(
+      {
+        type: "FeatureCollection",
+        features: chains.map((coords) => ({
+          type: "Feature",
+          properties: { c: wantPath ? 1 : 0 },
+          geometry: { type: "LineString", coordinates: coords },
+        })),
+      },
+      {
+        interactive: false,
+        style: {
+          color: wantPath ? "#1e7c66" : "#8d9a94",
+          weight: wantPath ? 3.4 : 2.4,
+          opacity: wantPath ? 0.85 : 0.55,
+        },
+      },
+    );
+  }
+
   function drawNetwork() {
     const L = LRef.current;
     const map = mapRef.current;
     const g = live.current.graph;
-    if (!L || !map || !g || networkLayer.current) return;
-    const features: any[] = [];
-    for (let i = 0; i < g.edgesA.length; i++) {
-      const a = g.edgesA[i];
-      const b = g.edgesB[i];
-      const isPath = g.edgesPath[i] === 1;
-      const name = g.edgesNameIdx[i] >= 0 ? g.names[g.edgesNameIdx[i]] : "";
-      features.push({
-        type: "Feature",
-        properties: { path: isPath ? 1 : 0, name },
-        geometry: {
-          type: "LineString",
-          coordinates: [
-            [g.nodes[a * 2 + 1], g.nodes[a * 2]],
-            [g.nodes[b * 2 + 1], g.nodes[b * 2]],
-          ],
-        },
-      });
+    if (!L || !map || !g || netLayers.current.paths) return;
+    const paths = buildChains(L, g, true);
+    const roads = buildChains(L, g, false);
+    if (paths) {
+      paths.addTo(map);
+      netLayers.current.paths = paths;
     }
-    const layer = L.geoJSON(
-      { type: "FeatureCollection", features },
-      {
-        style: (f: any) => ({
-          color: f.properties.path ? "#1e7c66" : "#8d9a94",
-          weight: f.properties.path ? 3.2 : 2.2,
-          opacity: f.properties.path ? 0.85 : 0.55,
-          interactive: false,
-        }),
-      },
-    );
-    layer.addTo(map);
-    networkLayer.current = layer;
+    if (roads) {
+      netLayers.current.roads = roads;
+    }
+    const apply = () => {
+      const roadsLayer = netLayers.current.roads;
+      if (!roadsLayer) return;
+      if (map.getZoom() >= ROAD_MIN_ZOOM) {
+        if (!map.hasLayer(roadsLayer)) roadsLayer.addTo(map);
+      } else if (map.hasLayer(roadsLayer)) {
+        map.removeLayer(roadsLayer);
+      }
+    };
+    map.on("zoomend", apply);
+    apply();
   }
 
   // ---- init the map once ----
@@ -119,6 +197,7 @@ export default function NavMap({ graph, start, end, route, pickMode, onMapClick,
       map.removeLayer(routeGroup.current);
       routeGroup.current = null;
     }
+    const svg = L.svg({ padding: 0.5 });
     const group = L.layerGroup();
     const { start: st, end: en, route: rt } = live.current;
     const mk = (lat: number, lng: number, letter: string, cls: string) => {
@@ -134,8 +213,8 @@ export default function NavMap({ graph, start, end, route, pickMode, onMapClick,
     if (en) group.addLayer(mk(en.lat, en.lng, "B", "cn-marker-end"));
     if (rt && rt.points.length > 1) {
       const ll = rt.points.map((p) => [p.lat, p.lng]);
-      const casing = L.polyline(ll, { color: "#ffffff", weight: 13, opacity: 0.9, interactive: false });
-      const line = L.polyline(ll, { color: "#1e7c66", weight: 6, opacity: 0.95, className: "route-line", interactive: false });
+      const casing = L.polyline(ll, { color: "#ffffff", weight: 13, opacity: 0.9, interactive: false, renderer: svg });
+      const line = L.polyline(ll, { color: "#1e7c66", weight: 6, opacity: 0.95, className: "route-line", interactive: false, renderer: svg });
       casing.addTo(group);
       line.addTo(group);
     }
