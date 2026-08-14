@@ -289,7 +289,7 @@ export default function NavMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ---- official EV-map overlay (draggable to align, persisted) ----
+  // ---- official EV-map overlay: align it yourself with two corner handles ----
   useEffect(() => {
     const L = LRef.current;
     const map = mapRef.current;
@@ -305,63 +305,62 @@ export default function NavMap({
           }
         } catch {}
       }
-      if (!b) {
-        b = L.latLngBounds([30.083, -81.508], [30.122, -81.336]);
-      }
+      if (!b) b = L.latLngBounds([30.083, -81.508], [30.122, -81.336]);
       overlayBounds.current = b;
-      const ov = L.imageOverlay("\/assets\/ev-overlay.png", b, {
-        opacity: evOpacity,
-        interactive: true,
-        className: "cn-ev-overlay",
-      });
+      const ov = L.imageOverlay("/assets/ev-overlay.png", b, { opacity: evOpacity, interactive: true });
       ov.addTo(map);
       overlayLayer.current = ov;
-      const el = ov.getElement();
-      if (el) {
-        let sx = 0, sy = 0, sb = b;
-        const down = (e: PointerEvent) => {
-          e.preventDefault();
-          sx = e.clientX; sy = e.clientY;
-          sb = L.latLngBounds(overlayLayer.current.getBounds());
-          overlayDrag.current = true;
-          map.dragging.disable();
-          el.setPointerCapture(e.pointerId);
-        };
-        const move = (e: PointerEvent) => {
-          if (!overlayDrag.current) return;
-          const dx = (e.clientX - sx) / Math.pow(2, map.getZoom()) * 256 / 111320 * 1.0;
-          // world delta in degrees (approx, Web Mercator)
-          const mPerPx = 156543.03392 * Math.cos((sb.getCenter().lat * Math.PI) / 180) / Math.pow(2, map.getZoom());
-          const dLat = -((e.clientY - sy) * mPerPx) / 111320;
-          const dLon = ((e.clientX - sx) * mPerPx) / (111320 * Math.cos((sb.getCenter().lat * Math.PI) / 180));
-          const nb = L.latLngBounds(
-            [sb.getSouth() + dLat, sb.getWest() + dLon],
-            [sb.getNorth() + dLat, sb.getEast() + dLon],
-          );
-          overlayLayer.current.setBounds(nb);
-          overlayBounds.current = nb;
-        };
-        const up = (e: PointerEvent) => {
-          if (!overlayDrag.current) return;
-          overlayDrag.current = false;
-          try { el.releasePointerCapture(e.pointerId); } catch {}
-          map.dragging.enable();
-          try {
-            const bb = overlayBounds.current;
-            const rec = { sw: [bb.getSouth(), bb.getWest()], ne: [bb.getNorth(), bb.getEast()] };
-            localStorage.setItem("evOverlayBounds", JSON.stringify(rec));
-          } catch {}
-        };
-        el.addEventListener("pointerdown", down);
-        el.addEventListener("pointermove", move);
-        el.addEventListener("pointerup", up);
-        el._cnHandlers = { down, move, up };
-      }
-    } else if (!evOverlay && overlayLayer.current) {
-      map.removeLayer(overlayLayer.current);
-      overlayLayer.current = null;
+
+      const handles = overlayLayer.current;  // placeholder
+      const mkHandle = (latlng: any, cls: string) =>
+        L.marker(latlng, {
+          draggable: true,
+          interactive: true,
+          icon: L.divIcon({ className: "", html: "<div class=\"cn-handle " + cls + "\"></div>", iconSize: [22, 22], iconAnchor: [11, 11] }),
+          zIndexOffset: 900,
+        });
+      const hTL = mkHandle(b.getNorthWest(), "cn-handle-tl");
+      const hBR = mkHandle(b.getSouthEast(), "cn-handle-br");
+      hTL.addTo(map);
+      hBR.addTo(map);
+
+      const persist = () => {
+        try {
+          const bb = overlayLayer.current.getBounds();
+          const rec = { sw: [bb.getSouth(), bb.getWest()], ne: [bb.getNorth(), bb.getEast()] };
+          localStorage.setItem("evOverlayBounds", JSON.stringify(rec));
+        } catch {}
+      };
+      const sync = () => {
+        const bb = overlayLayer.current.getBounds();
+        hTL.setLatLng(bb.getNorthWest());
+        hBR.setLatLng(bb.getSouthEast());
+      };
+      hTL.on("drag", () => {
+        const nd = hTL.getLatLng();
+        const bb = overlayLayer.current.getBounds();
+        overlayLayer.current.setBounds(L.latLngBounds(nd, [bb.getSouth(), bb.getEast()]));
+      });
+      hBR.on("drag", () => {
+        const nd = hBR.getLatLng();
+        const bb = overlayLayer.current.getBounds();
+        overlayLayer.current.setBounds(L.latLngBounds([bb.getNorth(), bb.getWest()], nd));
+      });
+      hTL.on("dragend", persist);
+      hBR.on("dragend", persist);
+      map.on("moveend zoomend", sync);
+      (ov as any)._cnHandles = { hTL: hTL, hBR: hBR, persist: persist, sync: sync };
     } else if (evOverlay && overlayLayer.current) {
       overlayLayer.current.setOpacity(evOpacity);
+    } else if (!evOverlay && overlayLayer.current) {
+      const h = (overlayLayer.current as any)._cnHandles;
+      if (h) {
+        map.off("moveend zoomend", h.sync);
+        h.hTL.remove();
+        h.hBR.remove();
+      }
+      map.removeLayer(overlayLayer.current);
+      overlayLayer.current = null;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [evOverlay, evOpacity, mapReady]);
