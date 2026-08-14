@@ -185,6 +185,13 @@ export default function NavMap({
     const map = mapRef.current;
     const g = live.current.graph;
     if (!L || !map || !g || netLayers.current.paths) return;
+    const bb = live.current.graph?.bbox;
+    if (bb && bb.length === 4) {
+      map.setMaxBounds([
+        [bb[0] - 0.012, bb[1] - 0.012],
+        [bb[2] + 0.012, bb[3] + 0.012],
+      ]);
+    }
     const paths = buildChains(L, g, true);
     const roads = buildChains(L, g, false);
     if (paths) {
@@ -240,7 +247,9 @@ export default function NavMap({
             zoomControl: false,
             attributionControl: true,
             preferCanvas: true,
-          }).setView([30.095, -81.414], 13);
+            minZoom: 10,
+            maxZoom: 17,
+          }).setView([30.095, -81.414], 13.5);
           mapRef.current = map;
           L.control.zoom({ position: "bottomright" }).addTo(map);
           map.on("click", (ev: any) => {
