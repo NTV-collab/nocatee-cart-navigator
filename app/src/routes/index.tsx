@@ -145,10 +145,13 @@ function Index() {
       } else {
         setEnd(pt);
         setSearchTarget("start");
+        // when no start point exists, use the device location so a route
+        // line appears right away instead of waiting for a manual tap
+        if (!start) locateMe();
       }
       setSearch("");
     },
-    [pickMode],
+    [pickMode, start, locateMe],
   );
 
   const clearAll = useCallback(() => {
