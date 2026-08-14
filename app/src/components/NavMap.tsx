@@ -11,13 +11,15 @@ type Props = {
   locPos: MapPoint | null;
   locAcc: number | null;
   follow: boolean;
+  satellite: boolean;
+  onToggleSatellite: () => void;
   onMapClick: (p: MapPoint) => void;
   onReady: () => void;
 };
 
 const ROAD_MIN_ZOOM = 13.5;
 
-export default function NavMap({ graph, start, end, route, pickMode, locPos, locAcc, follow, onMapClick, onReady }: Props) {
+export default function NavMap({ graph, start, end, route, pickMode, locPos, locAcc, follow, satellite, onMapClick, onReady }: Props) {
   const holder = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const LRef = useRef<any>(null);
@@ -29,7 +31,6 @@ export default function NavMap({ graph, start, end, route, pickMode, locPos, loc
   const live = useRef({ graph, start, end, route, pickMode, locPos, locAcc, follow, onMapClick, onReady });
   live.current = { graph, start, end, route, pickMode, locPos, locAcc, follow, onMapClick, onReady };
   const readyFired = useRef(false);
-  const [satellite, setSatellite] = useState(false);
   const [mapReady, setMapReady] = useState(false);
 
   // Merge the raw edge list into continuous polylines (paths or roads).
@@ -347,17 +348,5 @@ export default function NavMap({ graph, start, end, route, pickMode, locPos, loc
     }
   }, [locPos, follow]);
 
-  return (
-    <div className="relative h-full w-full">
-      <div ref={holder} className="h-full w-full" aria-label="Nocatee cart path map" />
-      <button
-        onClick={() => setSatellite((v) => !v)}
-        title={satellite ? "Show street map" : "Show satellite view"}
-        aria-label={satellite ? "Show street map" : "Show satellite view"}
-        className="absolute left-3 top-3 z-[500] rounded-full border border-cn-line bg-white/95 px-3.5 py-2 font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-cn-ink-soft shadow-md transition hover:text-cn-teal-deep active:scale-95"
-      >
-        {satellite ? "Map" : "Satellite"}
-      </button>
-    </div>
-  );
+  return <div ref={holder} className="h-full w-full" aria-label="Nocatee cart path map" />;
 }
