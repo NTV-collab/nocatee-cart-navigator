@@ -17,10 +17,9 @@ type Props = {
   onReady: () => void;
 };
 
-const CART_GLYPH = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="9.5" width="12" height="5.5" rx="1.6"/><path d="M9.5 9.5V6.2h4.6a1.9 1.9 0 0 1 1.9 1.9v1.4"/><path d="M10.5 6.2 9.8 4.6"/><circle cx="7.2" cy="16.2" r="1.5"/><circle cx="13.8" cy="16.2" r="1.5"/><path d="M17.5 8h1.8a1 1 0 0 1 1 1v3.4"/></svg>`;
+const CART_GLYPH = `<svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="9.5" width="12" height="5.5" rx="1.6"/><path d="M9.5 9.5V6.2h4.6a1.9 1.9 0 0 1 1.9 1.9v1.4"/><path d="M10.5 6.2 9.8 4.6"/><circle cx="7.2" cy="16.2" r="1.5"/><circle cx="13.8" cy="16.2" r="1.5"/><path d="M17.5 8h1.8a1 1 0 0 1 1 1v3.4"/></svg>`;
 
-// Raster tile chain: plain <img> tiles, no WebGL, no workers. If a provider
-// fails to deliver, we swap to the next one automatically.
+// Raster tile chain: plain <img> tiles, no WebGL, no workers.
 const TILE_CHAIN: { url: string; opts: Record<string, unknown> }[] = [
   {
     url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
@@ -60,6 +59,7 @@ export default function NavMap({
   const streetLayer = useRef<any>(null);
   const satLayer = useRef<any>(null);
   const chainIdx = useRef(0);
+  const autoCentered = useRef(false);
   const live = useRef({ graph, start, end, route, locPos, locAcc, follow, onMapClick, onReady });
   live.current = { graph, start, end, route, locPos, locAcc, follow, onMapClick, onReady };
   const readyFired = useRef(false);
@@ -166,7 +166,6 @@ export default function NavMap({
     }
   }
 
-  // Install the street base layer, with automatic provider failover.
   function installStreetLayer(L: any, map: any) {
     const spec = TILE_CHAIN[chainIdx.current];
     const layer = L.tileLayer(spec.url, spec.opts);
@@ -315,20 +314,25 @@ export default function NavMap({
         weight: 1,
         opacity: 0.4,
         fillColor: "#2fae9a",
-        fillOpacity: 0.1,
+        fillOpacity: 0.12,
         interactive: false,
       });
-      const cart = L.marker([lp.lat, lp.lng], {
+      const pin = L.marker([lp.lat, lp.lng], {
         icon: L.divIcon({
-          className: "",
-          html: `<div class="cn-cart">${CART_GLYPH}</div>`,
-          iconSize: [38, 38],
-          iconAnchor: [19, 19],
+          className: "cn-loc-pin",
+          html: `<div class="cn-loc-wrap"><div class="cn-cart">${CART_GLYPH}</div><div class="cn-loc-tag">You</div></div>`,
+          iconSize: [46, 66],
+          iconAnchor: [23, 54],
         }),
         interactive: false,
+        zIndexOffset: 1000,
       });
       group.addLayer(ring);
-      group.addLayer(cart);
+      group.addLayer(pin);
+      if (!st && !en && !autoCentered.current) {
+        autoCentered.current = true;
+        map.setView([lp.lat, lp.lng], 15, { animate: true });
+      }
     }
     if (rt && rt.points.length > 1) {
       const ll = rt.points.map((p) => [p.lat, p.lng]);
@@ -349,9 +353,10 @@ export default function NavMap({
     }
     if (bounds.length >= 2) {
       map.fitBounds(L.latLngBounds(bounds), { padding: [46, 46], maxZoom: 15 });
-    } else if (bounds.length === 1 && !locPos) {
+    } else if (bounds.length === 1 && !lp) {
       map.setView([bounds[0][0], bounds[0][1]], 15);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [start, end, route, locPos, locAcc, redrawTick]);
 
   // ---- live follow ----
