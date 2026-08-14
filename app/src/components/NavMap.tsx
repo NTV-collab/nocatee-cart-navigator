@@ -412,20 +412,21 @@ export default function NavMap({
     const g = L.layerGroup();
     for (const t of trails) {
       if (!t.geom || t.geom.length < 2) continue;
-      g.addLayer(
-        L.polyline(t.geom.map((c) => [c[0], c[1]]), {
-          color: "#2f8b4e",
-          weight: 7,
-          opacity: 0.95,
-          interactive: false,
-        }),
-      );
+      const pl = L.polyline(t.geom.map((c) => [c[0], c[1]]), {
+        color: "#127a43",
+        weight: 3.2,
+        opacity: 0.9,
+        interactive: false,
+      });
+      const nm = (t as any).name || "Greenway";
+      pl.bindTooltip(nm, { permanent: true, direction: "center", className: "cn-trail-label-sm", opacity: 1 });
+      g.addLayer(pl);
     }
     if (draftPoints && draftPoints.length > 1) {
       g.addLayer(
         L.polyline(
           draftPoints.map((p) => [p.lat, p.lng]),
-          { color: "#2f8b4e", weight: 7, opacity: 0.5, dashArray: "6 8", interactive: false },
+          { color: "#127a43", weight: 3, opacity: 0.55, dashArray: "6 8", interactive: false },
         ),
       );
     }

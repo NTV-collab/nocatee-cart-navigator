@@ -354,18 +354,21 @@ function Index() {
                 <div className="p-3">
                   <div
                     className="flex items-center gap-2 rounded-xl border border-cn-line bg-white px-3 py-2 transition focus-within:border-cn-teal"
-                    onClick={() => setActiveInput("start")}
+                    onClick={() => setSearchTarget("end")}
                   >
-                    <span className="grid size-6 shrink-0 place-items-center rounded-full bg-cn-teal text-[11px] font-bold text-white">A</span>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                      <circle cx="11" cy="11" r="7" />
+                      <path d="m20 20-3.5-3.5" />
+                    </svg>
                     <input
-                      value={fromValue}
+                      value={searchTarget === "end" ? search : end?.label ?? ""}
                       onChange={(e) => {
-                        setSearchTarget("start");
+                        setSearchTarget("end");
                         setSearch(e.target.value);
                       }}
-                      onFocus={() => setActiveInput("start")}
-                      placeholder="From: your street, home..."
-                      aria-label="From"
+                      onFocus={() => setSearchTarget("end")}
+                      placeholder="Where to? (Town Center, Splash...)"
+                      aria-label="Where to"
                       className="w-full bg-transparent text-[14px] font-medium outline-none placeholder:text-cn-ink-soft/50"
                     />
                     <button
@@ -374,33 +377,16 @@ function Index() {
                         locateMe();
                       }}
                       disabled={locating}
-                      title="Use my location"
+                      title="Point A = my location"
                       aria-label="Use my location"
                       className="grid size-7 shrink-0 place-items-center rounded-full bg-cn-mist text-cn-teal-deep transition hover:bg-cn-teal hover:text-white active:scale-95 disabled:opacity-50"
                     >
                       {locateIcon}
                     </button>
                   </div>
-                  <div className="mx-[13px] h-4 w-px bg-cn-line" />
-                  <div
-                    className="flex items-center gap-2 rounded-xl border border-cn-line bg-white px-3 py-2 transition focus-within:border-cn-ink"
-                    onClick={() => setActiveInput("end")}
-                  >
-                    <span className="grid size-6 shrink-0 place-items-center rounded-full bg-cn-ink text-[11px] font-bold text-white">B</span>
-                    <input
-                      value={toValue}
-                      onChange={(e) => {
-                        setSearchTarget("end");
-                        setSearch(e.target.value);
-                      }}
-                      onFocus={() => setActiveInput("end")}
-                      placeholder="Destination (Town Center, Splash...)"
-                      className="w-full bg-transparent text-[14px] font-medium outline-none placeholder:text-cn-ink-soft/50"
-                    />
-                    <span className="shrink-0 rounded-full bg-cn-mist px-2 py-0.5 font-mono text-[9px] uppercase tracking-wide text-cn-ink-soft">
-                      {pickMode === "start" ? "tap map = A" : "tap map = B"}
-                    </span>
-                  </div>
+                  <p className="mt-1.5 px-1 font-mono text-[9px] uppercase tracking-[0.14em] text-cn-ink-soft">
+                    Point A is your live location
+                  </p>
 
                   {showResults && (
                     <ul className="mt-2 max-h-56 overflow-y-auto rounded-xl border border-cn-line bg-white shadow-sm">
@@ -559,29 +545,9 @@ function Index() {
               )}
 
               <div className="flex items-center gap-3">
-                <div className="hidden shrink-0 items-center gap-1 rounded-full border border-cn-line bg-white/95 p-1 shadow-sm sm:flex">
-                  <button
-                    onClick={() => setActiveInput("start")}
-                    className={
-                      "rounded-full px-3 py-1.5 font-mono text-[10px] font-semibold uppercase tracking-wide transition " +
-                      (pickMode === "start" ? "bg-cn-teal text-white" : "text-cn-ink-soft hover:text-cn-teal-deep")
-                    }
-                  >
-                    Set A
-                  </button>
-                  <button
-                    onClick={() => setActiveInput("end")}
-                    className={
-                      "rounded-full px-3 py-1.5 font-mono text-[10px] font-semibold uppercase tracking-wide transition " +
-                      (pickMode === "end" ? "bg-cn-ink text-white" : "text-cn-ink-soft hover:text-cn-ink")
-                    }
-                  >
-                    Set B
-                  </button>
-                </div>
                 <div className="flex-1">
                   <p className="mb-1.5 font-mono text-[9px] uppercase tracking-[0.16em] text-white/90">
-                    Tap a chip to set {pickMode === "start" ? "point A" : "point B"}
+                    Pick a destination
                   </p>
                   <div className="scrollbar-none flex gap-2 overflow-x-auto pb-1">
                     {DESTINATIONS.map((d) => (

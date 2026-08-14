@@ -295,3 +295,19 @@ body {
   padding: 2px 6px;
   box-shadow: 0 1px 4px rgb(20 43 43 / 0.25);
 }
+
+/* small modern trail label */
+.cn-trail-label-sm {
+  background: rgb(255 255 255 / 0.72);
+  backdrop-filter: blur(2px);
+  border: none;
+  border-radius: 9999px;
+  color: #115e32;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 1px 7px;
+  box-shadow: none;
+}
