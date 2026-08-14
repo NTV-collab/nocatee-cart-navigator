@@ -151,12 +151,13 @@ export default function NavMap({
         style: (f: any) => {
           const nm = f.properties?.name || "";
           if (f.properties?.kind === "road") {
-            return { color: "#8d9a94", weight: 2.2, opacity: 0.55 };
+            // every legal street is green (incl. parking-lot drives)
+            return { color: "#2f8f4e", weight: 2.4, opacity: 0.8 };
           }
           if (nm && TRAIL_COLORS[nm]) {
             return { color: TRAIL_COLORS[nm], weight: 3.6, opacity: 0.95 };
           }
-          return { color: "#1e7c66", weight: 3.2, opacity: 0.8 };
+          return { color: "#23905f", weight: 3.2, opacity: 0.85 };
         },
       },
     );

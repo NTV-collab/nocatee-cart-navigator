@@ -576,7 +576,7 @@ function Index() {
 
       {/* tiny attribution line */}
       <div className="absolute bottom-1 left-2 z-[300] rounded-md bg-white/70 px-1.5 py-0.5 font-mono text-[9px] text-cn-ink-soft">
-        OpenStreetMap & cart-path data · red = not permitted for carts · not affiliated with Nocatee
+        OpenStreetMap & cart-path data · red = not permitted for carts \u00b7 green = legal paths & streets (incl. parking-lot drives) · not affiliated with Nocatee
       </div>
     </div>
   );
