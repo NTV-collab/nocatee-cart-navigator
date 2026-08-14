@@ -149,6 +149,7 @@ export default function NavMap({ graph, start, end, route, pickMode, locPos, loc
     let disposed = false;
     let map: any = null;
     let ro: ResizeObserver | null = null;
+    let onVis: (() => void) | null = null;
     let attempts = 0;
     const el = holder.current;
     if (!el) return;
@@ -214,7 +215,7 @@ export default function NavMap({ graph, start, end, route, pickMode, locPos, loc
           ro = new ResizeObserver(fixSize);
           if (holder.current) ro.observe(holder.current);
           window.addEventListener("resize", fixSize);
-          const onVis = () => {
+          onVis = () => {
             if (!document.hidden) fixSize();
           };
           document.addEventListener("visibilitychange", onVis);
@@ -250,7 +251,7 @@ export default function NavMap({ graph, start, end, route, pickMode, locPos, loc
       disposed = true;
       if (ro) ro.disconnect();
       window.removeEventListener("resize", fixSize);
-      document.removeEventListener("visibilitychange", onVis);
+      if (onVis) document.removeEventListener("visibilitychange", onVis);
       window.removeEventListener("pageshow", fixSize);
       if (map) map.remove();
       mapRef.current = null;
