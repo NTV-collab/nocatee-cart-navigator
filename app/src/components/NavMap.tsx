@@ -188,8 +188,8 @@ export default function NavMap({
     const bb = live.current.graph?.bbox;
     if (bb && bb.length === 4) {
       map.setMaxBounds([
-        [bb[0] - 0.012, bb[1] - 0.012],
-        [bb[2] + 0.012, bb[3] + 0.012],
+        [bb[0] - 0.006, bb[1] - 0.006],
+        [bb[2] + 0.006, bb[3] + 0.006],
       ]);
     }
     const paths = buildChains(L, g, true);
@@ -247,7 +247,7 @@ export default function NavMap({
             zoomControl: false,
             attributionControl: true,
             preferCanvas: true,
-            minZoom: 10,
+            minZoom: 11,
             maxZoom: 17,
           }).setView([30.095, -81.414], 13.5);
           mapRef.current = map;

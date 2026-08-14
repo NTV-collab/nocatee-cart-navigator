@@ -31,6 +31,10 @@ function Index() {
   const [locPos, setLocPos] = useState<MapPoint | null>(null);
   const [locAcc, setLocAcc] = useState<number | null>(null);
   const [locError, setLocError] = useState<string | null>(null);
+  const [locBannerDismissed, setLocBannerDismissed] = useState(false);
+  useEffect(() => {
+    if (!locError) setLocBannerDismissed(false);
+  }, [locError]);
   const [satellite, setSatellite] = useState(false);
   const [evOverlay, setEvOverlay] = useState(false);
   const [evOpacity, setEvOpacity] = useState(0.55);
@@ -332,9 +336,18 @@ function Index() {
       />
 
       {/* location feedback banner */}
-      {locError && (
-        <div className="absolute left-1/2 top-24 z-[650] w-[92%] max-w-md -translate-x-1/2 rounded-xl border border-cn-clay/50 bg-cn-paper/95 px-4 py-2.5 text-[12px] leading-snug text-cn-ink shadow-lg backdrop-blur-sm">
-          {locError}
+      {locError && !locBannerDismissed && (
+        <div className="absolute left-1/2 top-24 z-[650] flex w-[92%] max-w-md -translate-x-1/2 items-start gap-2 rounded-lg border border-cn-clay/40 bg-cn-paper/95 px-3.5 py-2.5 text-[12px] leading-snug text-cn-ink shadow-lg backdrop-blur-sm">
+          <span className="flex-1">{locError}</span>
+          <button
+            onClick={() => setLocBannerDismissed(true)}
+            aria-label="Dismiss location notice"
+            className="grid size-6 shrink-0 place-items-center rounded-full text-cn-ink-soft transition hover:bg-cn-sand-deep hover:text-cn-ink"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
         </div>
       )}
 
