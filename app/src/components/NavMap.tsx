@@ -12,6 +12,8 @@ type Props = {
   locAcc: number | null;
   follow: boolean;
   satellite: boolean;
+  evOverlay: boolean;
+  evOpacity: number;
   onToggleSatellite: () => void;
   onMapClick: (p: MapPoint) => void;
   onReady: () => void;
@@ -48,6 +50,8 @@ export default function NavMap({
   locAcc,
   follow,
   satellite,
+  evOverlay,
+  evOpacity,
   onMapClick,
   onReady,
 }: Props) {
@@ -60,6 +64,9 @@ export default function NavMap({
   const satLayer = useRef<any>(null);
   const chainIdx = useRef(0);
   const autoCentered = useRef(false);
+  const overlayLayer = useRef<any>(null);
+  const overlayBounds = useRef<any>(null);
+  const overlayDrag = useRef<any>(null);
   const live = useRef({ graph, start, end, route, locPos, locAcc, follow, onMapClick, onReady });
   live.current = { graph, start, end, route, locPos, locAcc, follow, onMapClick, onReady };
   const readyFired = useRef(false);
@@ -281,6 +288,83 @@ export default function NavMap({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ---- official EV-map overlay (draggable to align, persisted) ----
+  useEffect(() => {
+    const L = LRef.current;
+    const map = mapRef.current;
+    if (!L || !map || !mapReady) return;
+    if (evOverlay && !overlayLayer.current) {
+      let b = overlayBounds.current;
+      if (!b) {
+        try {
+          const saved = localStorage.getItem("evOverlayBounds");
+          if (saved) {
+            const j = JSON.parse(saved);
+            if (j && j.sw && j.ne) b = L.latLngBounds(j.sw, j.ne);
+          }
+        } catch {}
+      }
+      if (!b) {
+        b = L.latLngBounds([30.083, -81.508], [30.122, -81.336]);
+      }
+      overlayBounds.current = b;
+      const ov = L.imageOverlay("\/assets\/ev-overlay.png", b, {
+        opacity: evOpacity,
+        interactive: true,
+        className: "cn-ev-overlay",
+      });
+      ov.addTo(map);
+      overlayLayer.current = ov;
+      const el = ov.getElement();
+      if (el) {
+        let sx = 0, sy = 0, sb = b;
+        const down = (e: PointerEvent) => {
+          e.preventDefault();
+          sx = e.clientX; sy = e.clientY;
+          sb = L.latLngBounds(overlayLayer.current.getBounds());
+          overlayDrag.current = true;
+          map.dragging.disable();
+          el.setPointerCapture(e.pointerId);
+        };
+        const move = (e: PointerEvent) => {
+          if (!overlayDrag.current) return;
+          const dx = (e.clientX - sx) / Math.pow(2, map.getZoom()) * 256 / 111320 * 1.0;
+          // world delta in degrees (approx, Web Mercator)
+          const mPerPx = 156543.03392 * Math.cos((sb.getCenter().lat * Math.PI) / 180) / Math.pow(2, map.getZoom());
+          const dLat = -((e.clientY - sy) * mPerPx) / 111320;
+          const dLon = ((e.clientX - sx) * mPerPx) / (111320 * Math.cos((sb.getCenter().lat * Math.PI) / 180));
+          const nb = L.latLngBounds(
+            [sb.getSouth() + dLat, sb.getWest() + dLon],
+            [sb.getNorth() + dLat, sb.getEast() + dLon],
+          );
+          overlayLayer.current.setBounds(nb);
+          overlayBounds.current = nb;
+        };
+        const up = (e: PointerEvent) => {
+          if (!overlayDrag.current) return;
+          overlayDrag.current = false;
+          try { el.releasePointerCapture(e.pointerId); } catch {}
+          map.dragging.enable();
+          try {
+            const bb = overlayBounds.current;
+            const rec = { sw: [bb.getSouth(), bb.getWest()], ne: [bb.getNorth(), bb.getEast()] };
+            localStorage.setItem("evOverlayBounds", JSON.stringify(rec));
+          } catch {}
+        };
+        el.addEventListener("pointerdown", down);
+        el.addEventListener("pointermove", move);
+        el.addEventListener("pointerup", up);
+        el._cnHandlers = { down, move, up };
+      }
+    } else if (!evOverlay && overlayLayer.current) {
+      map.removeLayer(overlayLayer.current);
+      overlayLayer.current = null;
+    } else if (evOverlay && overlayLayer.current) {
+      overlayLayer.current.setOpacity(evOpacity);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [evOverlay, evOpacity, mapReady]);
 
   // ---- street / satellite toggle ----
   useEffect(() => {

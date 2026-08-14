@@ -31,6 +31,8 @@ function Index() {
   const [locAcc, setLocAcc] = useState<number | null>(null);
   const [locError, setLocError] = useState<string | null>(null);
   const [satellite, setSatellite] = useState(false);
+  const [evOverlay, setEvOverlay] = useState(false);
+  const [evOpacity, setEvOpacity] = useState(0.55);
   const [driving, setDriving] = useState(false);
   const locWatch = useRef<number | null>(null);
   const trackingRef = useRef(false);
@@ -270,6 +272,8 @@ function Index() {
         locAcc={locAcc}
         follow={tracking}
         satellite={satellite}
+        evOverlay={evOverlay}
+        evOpacity={evOpacity}
         onToggleSatellite={() => setSatellite((v) => !v)}
         onMapClick={onMapClick}
         onReady={() => setReady(true)}
