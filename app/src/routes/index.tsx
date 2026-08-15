@@ -524,30 +524,7 @@ function Index() {
                       </button>
                     </div>
                   </div>
-                  <ol className="space-y-2">
-                    {route.steps.map((s, i) => (
-                      <li key={i} className="flex gap-3 text-sm leading-snug">
-                        <span
-                          className={
-                            "mt-0.5 shrink-0 rounded-full px-2 py-0.5 font-mono text-[10px] " +
-                            (s.kind === "arrive"
-                              ? "bg-cn-ink text-white"
-                              : s.kind === "turn"
-                                ? "bg-cn-mist text-cn-teal-deep"
-                                : s.kind === "cross"
-                                  ? "bg-cn-sand-deep text-cn-clay"
-                                  : "bg-cn-mist text-cn-ink-soft")
-                          }
-                        >
-                          {s.kind === "arrive" ? "OK" : i + 1}
-                        </span>
-                        <span className="text-[13px] text-cn-ink">
-                          {s.text}
-                          {s.dist > 0 && <span className="ml-1.5 font-mono text-[11px] text-cn-ink-soft">{fmtMeters(s.dist)}</span>}
-                        </span>
-                      </li>
-                    ))}
-                  </ol>
+                  <ol className="space-y-1.5">{route.steps.slice(0, 1).map((n) => (<li key={0} className="flex items-center gap-2 px-1"><span className="grid size-6 shrink-0 place-items-center rounded-full bg-cn-teal font-mono text-[10px] font-bold text-white">{route.steps.length > 1 ? route.steps.length : "\u2192"}</span><span className="min-w-0 flex-1 truncate text-[13px] font-medium text-cn-ink">{n ? n.text : "Arrive at destination"}</span>{route.steps.length > 1 && (<span className="shrink-0 rounded-full bg-cn-mist px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide text-cn-ink-soft">+{route.steps.length - 1} turns</span>)}</li>))}</ol>
                 </div>
               )}
               {noRoute && (
@@ -621,30 +598,7 @@ function Index() {
           <div className="absolute inset-x-0 bottom-0 z-[500] max-h-[42dvh] overflow-y-auto px-3 pb-3 sm:px-4">
             <div className="mx-auto w-full max-w-xl rounded-2xl border border-cn-line bg-cn-paper/95 p-4 shadow-lg backdrop-blur-sm">
               <p className="mb-2 font-mono text-[9px] uppercase tracking-[0.18em] text-cn-ink-soft">Turn by turn</p>
-              <ol className="space-y-2">
-                {route.steps.map((s, i) => (
-                  <li key={i} className="flex gap-3 text-sm leading-snug">
-                    <span
-                      className={
-                        "mt-0.5 shrink-0 rounded-full px-2 py-0.5 font-mono text-[10px] " +
-                        (s.kind === "arrive"
-                          ? "bg-cn-ink text-white"
-                          : s.kind === "turn"
-                            ? "bg-cn-mist text-cn-teal-deep"
-                            : s.kind === "cross"
-                              ? "bg-cn-sand-deep text-cn-clay"
-                              : "bg-cn-mist text-cn-ink-soft")
-                      }
-                    >
-                      {s.kind === "arrive" ? "OK" : i + 1}
-                    </span>
-                    <span className="text-[13px] text-cn-ink">
-                      {s.text}
-                      {s.dist > 0 && <span className="ml-1.5 font-mono text-[11px] text-cn-ink-soft">{fmtMeters(s.dist)}</span>}
-                    </span>
-                  </li>
-                ))}
-              </ol>
+              <ol className="space-y-1.5">{route.steps.slice(0, 1).map((n) => (<li key={0} className="flex items-center gap-2 px-1"><span className="grid size-6 shrink-0 place-items-center rounded-full bg-cn-teal font-mono text-[10px] font-bold text-white">{route.steps.length > 1 ? route.steps.length : "\u2192"}</span><span className="min-w-0 flex-1 truncate text-[13px] font-medium text-cn-ink">{n ? n.text : "Arrive at destination"}</span>{route.steps.length > 1 && (<span className="shrink-0 rounded-full bg-cn-mist px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide text-cn-ink-soft">+{route.steps.length - 1} turns</span>)}</li>))}</ol>
             </div>
           </div>
         </>
