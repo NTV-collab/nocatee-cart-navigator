@@ -10,6 +10,26 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
+const toRad = (d: number) => (d * Math.PI) / 180;
+
+function nextTurnAngle(route: RouteResult): number {
+  const pts = route?.points;
+  if (!pts || pts.length < 2) return 0;
+  const brg = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => {
+    const y = Math.sin(toRad(b.lng - a.lng)) * Math.cos(toRad(b.lat));
+    const x =
+      Math.cos(toRad(a.lat)) * Math.sin(toRad(b.lat)) -
+      Math.sin(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.cos(toRad(b.lng - a.lng));
+    return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
+  };
+  const b0 = brg(pts[0], pts[1]);
+  if (route.steps[0]?.kind === "turn" && pts.length > 2) {
+    const b1 = brg(pts[1], pts[2]);
+    return (b1 - b0 + 540) % 360 - 180;
+  }
+  return b0;
+}
+
 const fmtMeters = (m: number): string => {
   if (m < 1000) return `${m} m`;
   return `${(m / 1000).toFixed(1)} km`;
@@ -524,7 +544,7 @@ function Index() {
                       </button>
                     </div>
                   </div>
-                  <ol className="space-y-1.5">{route.steps.slice(0, 1).map((n) => (<li key={0} className="flex items-center gap-2 px-1"><span className="grid size-6 shrink-0 place-items-center rounded-full bg-cn-teal font-mono text-[10px] font-bold text-white">{route.steps.length > 1 ? route.steps.length : "\u2192"}</span><span className="min-w-0 flex-1 truncate text-[13px] font-medium text-cn-ink">{n ? n.text : "Arrive at destination"}</span>{route.steps.length > 1 && (<span className="shrink-0 rounded-full bg-cn-mist px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide text-cn-ink-soft">+{route.steps.length - 1} turns</span>)}</li>))}</ol>
+                  <ol className="space-y-1.5">{route.steps.slice(0, 1).map((n) => (<li key={0} className="flex items-center gap-2 px-1"><span className="grid size-7 shrink-0 place-items-center rounded-full border border-cn-line bg-white text-cn-ink shadow-sm"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" style={{ transform: `rotate(${nextTurnAngle(route)}deg)` }} aria-hidden="true"><path d="M12 3l6.5 7.5h-4.2V21h-4.6V10.5H5.5L12 3z" /></svg></span><span className="min-w-0 flex-1 truncate text-[13px] font-medium text-cn-ink">{n ? n.text : "Arrive at destination"}</span>{route.steps.length > 1 && (<span className="shrink-0 rounded-full bg-cn-mist px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide text-cn-ink-soft">+{route.steps.length - 1} turns</span>)}</li>))}</ol>
                 </div>
               )}
               {noRoute && (
@@ -598,7 +618,7 @@ function Index() {
           <div className="absolute inset-x-0 bottom-0 z-[500] max-h-[42dvh] overflow-y-auto px-3 pb-3 sm:px-4">
             <div className="mx-auto w-full max-w-xl rounded-2xl border border-cn-line bg-cn-paper/95 p-4 shadow-lg backdrop-blur-sm">
               <p className="mb-2 font-mono text-[9px] uppercase tracking-[0.18em] text-cn-ink-soft">Turn by turn</p>
-              <ol className="space-y-1.5">{route.steps.slice(0, 1).map((n) => (<li key={0} className="flex items-center gap-2 px-1"><span className="grid size-6 shrink-0 place-items-center rounded-full bg-cn-teal font-mono text-[10px] font-bold text-white">{route.steps.length > 1 ? route.steps.length : "\u2192"}</span><span className="min-w-0 flex-1 truncate text-[13px] font-medium text-cn-ink">{n ? n.text : "Arrive at destination"}</span>{route.steps.length > 1 && (<span className="shrink-0 rounded-full bg-cn-mist px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide text-cn-ink-soft">+{route.steps.length - 1} turns</span>)}</li>))}</ol>
+              <ol className="space-y-1.5">{route.steps.slice(0, 1).map((n) => (<li key={0} className="flex items-center gap-2 px-1"><span className="grid size-7 shrink-0 place-items-center rounded-full border border-cn-line bg-white text-cn-ink shadow-sm"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" style={{ transform: `rotate(${nextTurnAngle(route)}deg)` }} aria-hidden="true"><path d="M12 3l6.5 7.5h-4.2V21h-4.6V10.5H5.5L12 3z" /></svg></span><span className="min-w-0 flex-1 truncate text-[13px] font-medium text-cn-ink">{n ? n.text : "Arrive at destination"}</span>{route.steps.length > 1 && (<span className="shrink-0 rounded-full bg-cn-mist px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide text-cn-ink-soft">+{route.steps.length - 1} turns</span>)}</li>))}</ol>
             </div>
           </div>
         </>
