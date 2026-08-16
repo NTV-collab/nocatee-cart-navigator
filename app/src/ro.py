@@ -3,18 +3,16 @@ os.chdir("/home/user/nocatee-cart-navigator-665d7ec0-6962-4020-bb8a-b2e86975b39c
 p = "src/components/NavMap.tsx"
 s = open(p).read()
 
-# props type
-old = "  netView?: boolean;\n  exportRef?: { current: (() => void) | null };\n};"
-new = "  netView?: boolean;\n  routeOnly?: boolean;\n  exportRef?: { current: (() => void) | null };\n};"
+old = "  netView?: boolean;\n  onMapReady?: (map: any) => void;\n  exportRef?: { current: (() => void) | null };\n};"
+new = "  netView?: boolean;\n  routeOnly?: boolean;\n  onMapReady?: (map: any) => void;\n  exportRef?: { current: (() => void) | null };\n};"
 assert old in s, "props"
 s = s.replace(old, new, 1)
 
-old = "  netView,\n  exportRef,"
-new = "  netView,\n  routeOnly,\n  exportRef,"
+old = "  netView,\n  onMapReady,\n  exportRef,"
+new = "  netView,\n  routeOnly,\n  onMapReady,\n  exportRef,"
 assert old in s, "desc"
 s = s.replace(old, new, 1)
 
-# routeOnly effect: insert right before the netView effect
 old = "  // ---- netView: hide the basemap so only the routed network shows ----"
 new = """  // ---- routeOnly: hide every overlay so only the highlighted route + pins show ----
   useEffect(() => {
@@ -39,4 +37,4 @@ assert old in s, "effect"
 s = s.replace(old, new, 1)
 
 open(p, "w").write(s)
-print("navmap routeOnly ok")
+print("navmap routeOnly applied")
