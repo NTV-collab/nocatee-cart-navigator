@@ -155,7 +155,7 @@ export default function NavMap({
         style: (f: any) => {
           const nm = f.properties?.name || "";
           if (f.properties?.kind === "road") {
-            const shared = ["marketside avenue", "capital green drive", "settlement drive", "nocatee village drive"];
+            const shared = ["marketside avenue", "capital green drive", "settlement drive", "nocatee village drive", "majestic eagle drive", "myrtle brook bend", "stately shoals trail", "willow bay drive"];
             if (shared.includes(nm.toLowerCase())) {
               return { color: "#43618c", weight: 3.2, opacity: 0.85 };
             }
