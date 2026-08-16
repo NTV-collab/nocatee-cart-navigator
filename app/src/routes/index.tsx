@@ -64,6 +64,7 @@ function Index() {
   const [saving, setSaving] = useState(false);
   const [trails, setTrails] = useState<{ id: number; geom: [number, number][]; kind: "path" | "road" }[]>([]);
   const [drawKind, setDrawKind] = useState<"path" | "road">("path");
+  const [movePin, setMovePin] = useState(false);
   const locWatch = useRef<number | null>(null);
   const trackingRef = useRef(false);
   trackingRef.current = tracking;
@@ -176,6 +177,11 @@ function Index() {
 
   const onMapClick = useCallback(
     (p: MapPoint) => {
+      if (movePin) {
+        setEnd((prev) => (prev ? { lat: p.lat, lng: p.lng, label: prev.label } : { lat: p.lat, lng: p.lng }));
+        setMovePin(false);
+        return;
+      }
       if (drawing) {
         setDraft((prev) => [...prev, p]);
         return;
@@ -189,7 +195,7 @@ function Index() {
         if (!start) setPickMode("start"); // next tap sets the start
       }
     },
-    [pickMode, start, driving, drawing],
+    [pickMode, start, driving, drawing, movePin],
   );
 
   const locateMe = useCallback(() => {
@@ -581,6 +587,15 @@ function Index() {
                         className="rounded-full bg-cn-teal px-4 py-2 text-[13px] font-semibold text-white shadow-md transition hover:bg-cn-teal-deep active:scale-95"
                       >
                         Start Drive
+                      </button>
+                      <button
+                        onClick={() => setMovePin((v) => !v)}
+                        className={
+                          "text-[12px] font-medium underline decoration-cn-line underline-offset-4 transition " +
+                          (movePin ? "text-cn-teal-deep" : "text-cn-ink-soft hover:text-cn-teal-deep")
+                        }
+                      >
+                        {movePin ? "Tap map to move pin..." : "Move pin"}
                       </button>
                       <button
                         onClick={clearAll}
