@@ -34,7 +34,10 @@ export class CartRouter {
       const path = g.edgesPath[i] === 1;
       const nameIdx = g.edgesNameIdx[i];
       // trails cost least; named streets a little; unnamed cut-throughs a lot
-      const cost = path ? w : nameIdx >= 0 ? Math.round(w * 1.2) : Math.round(w * 2.4);
+      // connectors (unnamed short roads I generated to cross arterials) can poke
+      // across fields/roads: keep only short ones and make them a last resort.
+      if (!path && nameIdx < 0 && w > 60) continue;
+      const cost = path ? w : nameIdx >= 0 ? Math.round(w * 1.2) : Math.round(w * 5);
       this.adj[a].push({ to: b, w, nameIdx, path, cost });
       this.adj[b].push({ to: a, w, nameIdx, path, cost });
     }
