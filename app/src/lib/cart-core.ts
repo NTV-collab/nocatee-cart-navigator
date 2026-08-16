@@ -16,7 +16,7 @@ export type RouteResult = {
   steps: RouteStep[];
 };
 
-type Edge = { to: number; w: number; nameIdx: number; path: boolean };
+type Edge = { to: number; w: number; nameIdx: number; path: boolean; cost: number };
 
 const CART_SPEED_MS = 6.7; // ~15 mph cruising
 
@@ -33,8 +33,10 @@ export class CartRouter {
       const w = g.edgesW[i];
       const path = g.edgesPath[i] === 1;
       const nameIdx = g.edgesNameIdx[i];
-      this.adj[a].push({ to: b, w, nameIdx, path });
-      this.adj[b].push({ to: a, w, nameIdx, path });
+      // trails cost least; named streets a little; unnamed cut-throughs a lot
+      const cost = path ? w : nameIdx >= 0 ? Math.round(w * 1.2) : Math.round(w * 2.4);
+      this.adj[a].push({ to: b, w, nameIdx, path, cost });
+      this.adj[b].push({ to: a, w, nameIdx, path, cost });
     }
   }
 
@@ -72,6 +74,7 @@ export class CartRouter {
     }
     const dist = new Float64Array(N).fill(Infinity);
     const prev = new Int32Array(N).fill(-1);
+    const prevW = new Int32Array(N).fill(0);
     dist[aIdx] = 0;
     const heap: number[] = [aIdx];
     const less = (i: number, j: number) => dist[heap[i]] < dist[heap[j]];
@@ -106,10 +109,11 @@ export class CartRouter {
       if (dist[u] === Infinity) break;
       if (u === bIdx) break;
       for (const e of this.adj[u]) {
-        const nd = dist[u] + e.w;
+        const nd = dist[u] + e.cost;
         if (nd < dist[e.to]) {
           dist[e.to] = nd;
           prev[e.to] = u;
+          prevW[e.to] = e.w;
           heap.push(e.to);
           up(heap.length - 1);
         }
@@ -123,7 +127,12 @@ export class CartRouter {
       cur = prev[cur];
     }
     nodePath.reverse();
-    const meters = Math.round(dist[bIdx]);
+    let meters = 0;
+    let c2 = bIdx;
+    while (prev[c2] !== -1) {
+      meters += prevW[c2];
+      c2 = prev[c2];
+    }
     return {
       points: nodePath.map((n) => ({ lat: this.lat(n), lng: this.lng(n) })),
       nodePath,
@@ -165,8 +174,9 @@ export class CartRouter {
       const b = idxs[i + 1];
       if (a === b) continue;
       const w = Math.max(1, Math.round(hav(this.lat(a), this.lng(a), this.lat(b), this.lng(b))));
-      this.adj[a].push({ to: b, w, nameIdx, path: true });
-      this.adj[b].push({ to: a, w, nameIdx, path: true });
+      const cost = w;
+      this.adj[a].push({ to: b, w, nameIdx, path: true, cost });
+      this.adj[b].push({ to: a, w, nameIdx, path: true, cost });
     }
   }
 
