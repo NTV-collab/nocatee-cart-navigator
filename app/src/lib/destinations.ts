@@ -54,5 +54,5 @@ export const DESTINATIONS: Destination[] = [
   { name: 'Baptist Health AgeWell Center', sub: 'Health', lat: 30.112757, lng: -81.429209, zone: 'east', group: 'pools & clubs' },
   { name: 'Orange Theory Fitness', sub: 'Fitness', lat: 30.109717, lng: -81.418091, zone: 'east', group: 'pools & clubs' },
   { name: 'AT&T', sub: 'Mobile', lat: 30.109662, lng: -81.418406, zone: 'east', group: 'venues' },
-  { name: 'The Link (Innovation & Activity Hub)', sub: 'Hub', lat: 30.111613, lng: -81.418896, zone: 'east', group: 'venues' },
+  { name: 'The Link (Innovation & Activity Hub)', sub: 'Hub', lat: 30.109624, lng: -81.419238, zone: 'east', group: 'venues' },
 ];
