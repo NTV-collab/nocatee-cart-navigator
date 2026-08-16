@@ -66,6 +66,7 @@ function Index() {
   const [drawKind, setDrawKind] = useState<"path" | "road">("path");
   const [movePin, setMovePin] = useState(false);
   const [pinOverrides, setPinOverrides] = useState<Record<string, [number, number]>>({});
+  const [pinNotice, setPinNotice] = useState<string | null>(null);
   const locWatch = useRef<number | null>(null);
   const trackingRef = useRef(false);
   trackingRef.current = tracking;
@@ -189,9 +190,12 @@ function Index() {
         });
         setMovePin(false);
         if (label) {
-          try {
-            upsertTrail({ data: { name: label, geom: JSON.stringify([[p.lat, p.lng], [p.lat, p.lng]]) } });
-          } catch {}
+          upsertTrail({ data: { name: label, geom: JSON.stringify([[p.lat, p.lng], [p.lat, p.lng]]) } })
+            .then(() => {
+              setPinNotice("Pin saved: " + label);
+              window.setTimeout(() => setPinNotice(null), 4000);
+            })
+            .catch(() => setPinNotice("Could not save the pin. Try again."));
         }
         return;
       }
@@ -383,6 +387,11 @@ function Index() {
       />
 
       {/* location feedback banner */}
+      {pinNotice && (
+        <div className="absolute left-1/2 top-40 z-[650] w-[max-content] max-w-md -translate-x-1/2 rounded-lg border border-cn-teal/40 bg-cn-paper/95 px-4 py-2 text-[12px] font-medium text-cn-teal-deep shadow-lg backdrop-blur-sm">
+          {pinNotice}
+        </div>
+      )}
       {locError && !locBannerDismissed && (
         <div className="absolute left-1/2 top-24 z-[650] flex w-[92%] max-w-md -translate-x-1/2 items-start gap-2 rounded-lg border border-cn-clay/40 bg-cn-paper/95 px-3.5 py-2.5 text-[12px] leading-snug text-cn-ink shadow-lg backdrop-blur-sm">
           <span className="flex-1">{locError}</span>
