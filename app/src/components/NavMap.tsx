@@ -420,8 +420,8 @@ export default function NavMap({
       while (cur != null && !seen.has(String(cur))) {
         seen.add(String(cur));
         chain.push([g.nodes[cur * 2 + 1], g.nodes[cur * 2]]);
-        const nxt = (adj[String(cur)] || []).find((x) => !seen.has(String(x)));
-        cur = nxt != null ? nxt : null;
+        const nxt: number | undefined = (adj[String(cur)] || []).find((x) => !seen.has(String(x)));
+        cur = nxt ?? null;
       }
       if (chain.length > 1) chains.push(chain);
     }
