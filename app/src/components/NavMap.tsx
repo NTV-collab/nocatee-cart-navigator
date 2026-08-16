@@ -14,7 +14,7 @@ type Props = {
   satellite: boolean;
   evOverlay: boolean;
   evOpacity: number;
-  trails: { id: number; geom: [number, number][] }[];
+  trails: { id: number; geom: [number, number][]; kind?: "path" | "road" }[];
   draftPoints: MapPoint[];
   onToggleSatellite: () => void;
   onMapClick: (p: MapPoint) => void;
@@ -414,8 +414,8 @@ export default function NavMap({
     for (const t of trails) {
       if (!t.geom || t.geom.length < 2) continue;
       const pl = L.polyline(t.geom.map((c) => [c[0], c[1]]), {
-        color: "#127a43",
-        weight: 3.2,
+        color: t.kind === "road" ? "#43618c" : "#127a43",
+        weight: t.kind === "road" ? 3 : 3.2,
         opacity: 0.9,
         interactive: false,
       });

@@ -144,7 +144,7 @@ export class CartRouter {
 
   // Add an externally drawn trail (user-drawn legal path) to the routable
   // network: snap to nearby nodes where possible, else create new nodes.
-  addExternalTrail(coords: [number, number][], name = "Drawn Trail") {
+  addExternalTrail(coords: [number, number][], name = "Drawn Trail", isRoad = false) {
     const hav = (la1: number, lo1: number, la2: number, lo2: number) => {
       const dLat = ((la2 - la1) * Math.PI) / 180;
       const dLon = ((lo2 - lo1) * Math.PI) / 180;

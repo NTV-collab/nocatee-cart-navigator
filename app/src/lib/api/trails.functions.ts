@@ -6,13 +6,14 @@ export type TrailRow = {
   id: number;
   name: string;
   geom: string;
+  kind: string;
 };
 
 export const listTrails = createServerFn({ method: "GET" }).handler(async () => {
   const { DB } = bindings();
   if (!DB) return { trails: [] };
   const rows = await DB.prepare(
-    "SELECT id, name, geom FROM trails ORDER BY id ASC",
+    "SELECT id, name, geom, kind FROM trails ORDER BY id ASC",
   ).all<TrailRow>();
   return { trails: rows.results ?? [] };
 });
@@ -22,15 +23,16 @@ export const saveTrail = createServerFn({ method: "POST" })
     z.object({
       name: z.string().max(120).optional(),
       geom: z.string().min(10).max(500000),
+      kind: z.enum(["path", "road"]).optional().default("path"),
     }),
   )
   .handler(async ({ data }) => {
     const { DB } = bindings();
     if (!DB) throw new Error("database unavailable");
     const res = await DB.prepare(
-      "INSERT INTO trails (name, geom) VALUES (?, ?)",
+      "INSERT INTO trails (name, geom, kind) VALUES (?, ?, ?)",
     )
-      .bind(data.name ?? "", data.geom)
+      .bind(data.name ?? "", data.geom, data.kind ?? "path")
       .run();
     return { id: Number(res.meta.last_row_id) };
   });

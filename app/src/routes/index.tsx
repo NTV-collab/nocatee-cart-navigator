@@ -62,7 +62,8 @@ function Index() {
   const [drawing, setDrawing] = useState(false);
   const [draft, setDraft] = useState<MapPoint[]>([]);
   const [saving, setSaving] = useState(false);
-  const [trails, setTrails] = useState<{ id: number; geom: [number, number][] }[]>([]);
+  const [trails, setTrails] = useState<{ id: number; geom: [number, number][]; kind: "path" | "road" }[]>([]);
+  const [drawKind, setDrawKind] = useState<"path" | "road">("path");
   const locWatch = useRef<number | null>(null);
   const trackingRef = useRef(false);
   trackingRef.current = tracking;
@@ -97,18 +98,18 @@ function Index() {
     listTrails()
       .then(({ trails: rows }) => {
         if (!alive) return;
-        const parsed: { id: number; geom: [number, number][] }[] = [];
+        const parsed: { id: number; geom: [number, number][]; kind: "path" | "road" }[] = [];
         for (const r of rows) {
           try {
             const g: unknown = JSON.parse(r.geom);
             if (Array.isArray(g) && g.length > 1 && Array.isArray(g[0])) {
-              parsed.push({ id: r.id, geom: g as [number, number][] });
+              parsed.push({ id: r.id, geom: g as [number, number][], kind: r.kind === "road" ? "road" : "path" });
             }
           } catch {}
         }
         setTrails(parsed);
         for (const t of parsed) {
-          routerRef.current?.addExternalTrail(t.geom);
+          routerRef.current?.addExternalTrail(t.geom, undefined, t.kind === "road");
         }
       })
       .catch(() => {});
@@ -285,15 +286,15 @@ function Index() {
     setSaving(true);
     try {
       const geo = draft.map((p) => [p.lat, p.lng]) as [number, number][];
-      await saveTrail({ data: { geom: JSON.stringify(geo) } });
-      routerRef.current?.addExternalTrail(geo);
-      setTrails((prev) => [...prev, { id: Date.now(), geom: geo }]);
+      await saveTrail({ data: { geom: JSON.stringify(geo), kind: drawKind } });
+      routerRef.current?.addExternalTrail(geo, undefined, drawKind === "road");
+      setTrails((prev) => [...prev, { id: Date.now(), geom: geo, kind: drawKind }]);
       setDraft([]);
       setDrawing(false);
     } finally {
       setSaving(false);
     }
-  }, [draft]);
+  }, [draft, drawKind]);
 
   const filtered = search.trim()
     ? DESTINATIONS.filter((d) => (d.name + " " + d.sub).toLowerCase().includes(search.trim().toLowerCase()))
@@ -502,14 +503,34 @@ function Index() {
             {drawing && (
               <div className="flex flex-col items-end gap-1.5 rounded-xl border border-cn-line bg-white/95 p-2 shadow-md">
                 <span className="font-mono text-[9px] uppercase tracking-wide text-cn-ink-soft">
-                  Drawing trail ({draft.length} pts)
+                  Drawing {drawKind === "road" ? "street" : "trail"} ({draft.length} pts)
                 </span>
+                <div className="flex items-center gap-1 rounded-full bg-cn-sand-deep p-0.5">
+                  <button
+                    onClick={() => setDrawKind("path")}
+                    className={
+                      "rounded-full px-2.5 py-1 font-mono text-[10px] uppercase tracking-wide transition " +
+                      (drawKind === "path" ? "bg-cn-teal text-white" : "text-cn-ink-soft")
+                    }
+                  >
+                    Path
+                  </button>
+                  <button
+                    onClick={() => setDrawKind("road")}
+                    className={
+                      "rounded-full px-2.5 py-1 font-mono text-[10px] uppercase tracking-wide transition " +
+                      (drawKind === "road" ? "bg-[#43618c] text-white" : "text-cn-ink-soft")
+                    }
+                  >
+                    Road
+                  </button>
+                </div>
                 <button
                   onClick={() => saveDraft()}
                   disabled={draft.length < 2 || saving}
                   className="rounded-full bg-cn-teal px-3 py-1.5 text-[12px] font-semibold text-white disabled:opacity-40"
                 >
-                  {saving ? "Saving..." : "Save trail"}
+                  {saving ? "Saving..." : "Save"}
                 </button>
                 <button
                   onClick={() => setDraft((prev) => prev.slice(0, -1))}
@@ -651,7 +672,7 @@ function Index() {
 
       {/* tiny attribution line */}
       <div className="absolute bottom-1 left-2 z-[300] rounded-md bg-white/70 px-1.5 py-0.5 font-mono text-[9px] text-cn-ink-soft">
-        OpenStreetMap & cart-path data · red = not permitted for carts \u00b7 green = legal paths & streets (incl. parking-lot drives) · not affiliated with Nocatee
+        OpenStreetMap & cart-path data · blue = saved streets \u00b7 green = saved trails \u00b7 red = not permitted · not affiliated with Nocatee
       </div>
     </div>
   );

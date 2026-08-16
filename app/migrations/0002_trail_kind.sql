@@ -1,0 +1,1 @@
+ALTER TABLE trails ADD COLUMN kind TEXT NOT NULL DEFAULT 'path';
