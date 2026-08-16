@@ -207,22 +207,18 @@ export default function NavMap({
     const paths = buildChains(L, g, true);
     const roads = buildChains(L, g, false);
     if (paths) {
-      paths.addTo(map);
-      netLayers.current.paths = paths;
+netLayers.current.paths = paths;
     }
     if (roads) {
-      roads.addTo(map);
-      netLayers.current.roads = roads;
+netLayers.current.roads = roads;
     }
     const forb = buildForbidden(L, g);
     if (forb) {
-      forb.addTo(map);
-      netLayers.current.forbidden = forb;
+netLayers.current.forbidden = forb;
     }
     const hv = highlightVillage(L, g);
     if (hv) {
-      hv.addTo(map);
-      netLayers.current.highlight = hv;
+netLayers.current.highlight = hv;
     }
   }
 
@@ -492,7 +488,20 @@ export default function NavMap({
     return grp;
   }
 
-  // ---- routeOnly: hide every overlay so only the highlighted route + pins show ----
+  // ---- exportRef registration ----
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady) return;
+    if (exportRef) {
+      exportRef.current = exportPNG;
+      return () => {
+        if (exportRef) exportRef.current = null;
+      };
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapReady]);
+
+  // ---- unified overlay + basemap visibility: overlays are an editor view ----
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapReady) return;
@@ -506,28 +515,8 @@ export default function NavMap({
       trailsGroup.current,
       overlayLayer.current,
     ];
-    (routeOnly ? ovs.forEach(off) : ovs.forEach(on));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [routeOnly, mapReady]);
-
-  // ---- netView: hide the basemap so only the routed network shows ----
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !mapReady) return;
-    if (exportRef) {
-      exportRef.current = exportPNG;
-      return () => {
-        if (exportRef) exportRef.current = null;
-      };
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapReady]);
-
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !mapReady) return;
-    const off = (l: any) => l && map.hasLayer(l) && map.removeLayer(l);
-    const on = (l: any) => l && !map.hasLayer(l) && l.addTo(map);
+    const showOv = netView && !routeOnly;
+    ovs.forEach(showOv ? on : off);
     if (netView) {
       off(streetLayer.current);
       off(satLayer.current);
@@ -539,7 +528,7 @@ export default function NavMap({
       off(satLayer.current);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [netView, satellite, mapReady]);
+  }, [netView, routeOnly, satellite, mapReady]);
 
   // ---- street / satellite toggle ----
   useEffect(() => {
