@@ -418,7 +418,6 @@ export default function NavMap({
     };
     (Object.values(netLayers.current) as any[]).forEach(collect);
     if (routeGroup.current) collect(routeGroup.current);
-    if (routeRef.current) collect(routeRef.current);
     const size = map.getSize();
     const W = 1600;
     const R = W / size.x;
