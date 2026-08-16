@@ -11,7 +11,7 @@ export type Destination = {
 export const DESTINATIONS: Destination[] = [
   { name: "Nocatee Town Center", sub: "Shopping, dining, events", lat: 30.1100, lng: -81.41787, zone: "east", group: "town center" },
   { name: "Splash Waterpark", sub: "Pools, slides, cabanas", lat: 30.10359, lng: -81.41623, zone: "east", group: "water & parks" },
-  { name: "Spray Waterpark", sub: "Splash pad for little ones", lat: 30.10006, lng: -81.41568, zone: "east", group: "water & parks" },
+  { name: "Spray Waterpark", sub: "Splash pad for little ones", lat: 30.100119, lng: -81.414721, zone: "east", group: "water & parks" },
   { name: "Kids Splash Playground", sub: "Water play near the lagoon", lat: 30.10319, lng: -81.41589, zone: "east", group: "water & parks" },
   { name: "Nocatee Community Park", sub: "Athletic fields and courts", lat: 30.09667, lng: -81.41431, zone: "east", group: "water & parks" },
   { name: "Family Lagoon Pool", sub: "Resort pool at Town Center", lat: 30.10373, lng: -81.41584, zone: "east", group: "pools & clubs" },
