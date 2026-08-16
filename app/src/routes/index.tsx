@@ -67,6 +67,7 @@ function Index() {
   const trackingRef = useRef(false);
   trackingRef.current = tracking;
   const routerRef = useRef<CartRouter | null>(null);
+  const leafletMap = useRef<any>(null);
 
   useEffect(() => {
     let alive = true;
@@ -353,6 +354,9 @@ function Index() {
         onToggleSatellite={() => setSatellite((v) => !v)}
         onMapClick={onMapClick}
         onReady={() => setReady(true)}
+        onMapReady={(m) => {
+          leafletMap.current = m;
+        }}
       />
 
       {/* location feedback banner */}
@@ -460,6 +464,27 @@ function Index() {
             >
               {crosshairIcon}
             </button>
+            <div className="flex flex-col gap-1 rounded-full border border-cn-line bg-white/95 p-1 shadow-md">
+              <button
+                onClick={() => leafletMap.current?.zoomIn()}
+                aria-label="Zoom in"
+                className="grid size-8 place-items-center rounded-full text-cn-ink-soft transition hover:bg-cn-mist hover:text-cn-teal-deep active:scale-95"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+              </button>
+              <div className="h-px w-5 bg-cn-line" />
+              <button
+                onClick={() => leafletMap.current?.zoomOut()}
+                aria-label="Zoom out"
+                className="grid size-8 place-items-center rounded-full text-cn-ink-soft transition hover:bg-cn-mist hover:text-cn-teal-deep active:scale-95"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
+                  <path d="M5 12h14" />
+                </svg>
+              </button>
+            </div>
             <button
               onClick={() => setDrawing((v) => !v)}
               title={drawing ? "Stop drawing" : "Draw a trail"}

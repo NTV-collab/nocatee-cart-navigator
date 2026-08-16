@@ -19,6 +19,7 @@ type Props = {
   onToggleSatellite: () => void;
   onMapClick: (p: MapPoint) => void;
   onReady: () => void;
+  onMapReady?: (map: any) => void;
 };
 
 const CART_GLYPH = `<svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="9.5" width="12" height="5.5" rx="1.6"/><path d="M9.5 9.5V6.2h4.6a1.9 1.9 0 0 1 1.9 1.9v1.4"/><path d="M10.5 6.2 9.8 4.6"/><circle cx="7.2" cy="16.2" r="1.5"/><circle cx="13.8" cy="16.2" r="1.5"/><path d="M17.5 8h1.8a1 1 0 0 1 1 1v3.4"/></svg>`;
@@ -58,6 +59,7 @@ export default function NavMap({
   draftPoints,
   onMapClick,
   onReady,
+  onMapReady,
 }: Props) {
   const holder = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
@@ -251,7 +253,7 @@ export default function NavMap({
             maxZoom: 19,
           }).setView([30.095, -81.414], 13.5);
           mapRef.current = map;
-          L.control.zoom({ position: "bottomright" }).addTo(map);
+          onMapReady?.(map);
           map.on("click", (ev: any) => {
             live.current.onMapClick({ lat: ev.latlng.lat, lng: ev.latlng.lng });
           });
