@@ -571,9 +571,9 @@ netLayers.current.highlight = hv;
         ),
       );
     }
-    g.addTo(map);
+    if (netView && !routeOnly) g.addTo(map);
     trailsGroup.current = g;
-  }, [trails, draftPoints, mapReady]);
+  }, [trails, draftPoints, mapReady, netView, routeOnly]);
 
   // ---- graph arrives: draw the network ----
   useEffect(() => {
