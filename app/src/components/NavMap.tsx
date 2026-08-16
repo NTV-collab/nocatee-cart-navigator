@@ -151,6 +151,10 @@ export default function NavMap({
         style: (f: any) => {
           const nm = f.properties?.name || "";
           if (f.properties?.kind === "road") {
+            const shared = ["marketside avenue", "capital green drive", "settlement drive"];
+            if (shared.includes(nm.toLowerCase())) {
+              return { color: "#43618c", weight: 3.2, opacity: 0.85 };
+            }
             return { color: "#aeb4ad", weight: 1.8, opacity: 0.55 };
           }
           if (nm) {
