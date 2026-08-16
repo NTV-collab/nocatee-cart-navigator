@@ -69,6 +69,7 @@ function Index() {
   const [pinNotice, setPinNotice] = useState<string | null>(null);
   const [showSteps, setShowSteps] = useState(false);
   const [netView, setNetView] = useState(false);
+  const exportRef = useRef<(() => void) | null>(null);
   const locWatch = useRef<number | null>(null);
   const trackingRef = useRef(false);
   trackingRef.current = tracking;
@@ -389,6 +390,7 @@ function Index() {
           leafletMap.current = m;
         }}
         netView={netView}
+        exportRef={exportRef}
       />
 
       {/* location feedback banner */}
@@ -518,6 +520,20 @@ function Index() {
                 <path d="M7.8 7 10.5 16M16.2 7l-3.2 9" />
               </svg>
             </button>
+            {netView && (
+              <button
+                onClick={() => exportRef.current?.()}
+                aria-label="Export PNG"
+                title="Export current map as PNG"
+                className="grid size-11 place-items-center rounded-full border border-cn-teal bg-white/95 text-cn-teal-deep shadow-md transition active:scale-95 hover:bg-cn-teal hover:text-white"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <path d="m7 10 5 5 5-5" />
+                  <path d="M12 15V3" />
+                </svg>
+              </button>
+            )}
             <div className="flex flex-col gap-1 rounded-full border border-cn-line bg-white/95 p-1 shadow-md">
               <button
                 onClick={() => leafletMap.current?.zoomIn()}

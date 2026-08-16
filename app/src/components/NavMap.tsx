@@ -21,6 +21,7 @@ type Props = {
   onReady: () => void;
   netView?: boolean;
   onMapReady?: (map: any) => void;
+  exportRef?: { current: (() => void) | null };
 };
 
 const CART_GLYPH = `<svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="9.5" width="12" height="5.5" rx="1.6"/><path d="M9.5 9.5V6.2h4.6a1.9 1.9 0 0 1 1.9 1.9v1.4"/><path d="M10.5 6.2 9.8 4.6"/><circle cx="7.2" cy="16.2" r="1.5"/><circle cx="13.8" cy="16.2" r="1.5"/><path d="M17.5 8h1.8a1 1 0 0 1 1 1v3.4"/></svg>`;
@@ -62,6 +63,7 @@ export default function NavMap({
   onReady,
   onMapReady,
   netView,
+  exportRef,
 }: Props) {
   const holder = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
@@ -399,6 +401,60 @@ export default function NavMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [evOverlay, evOpacity, mapReady]);
 
+  // ---- export current view as PNG (network + markers, paper bg) ----
+  function exportPNG() {
+    const map = mapRef.current;
+    if (!map) return;
+    const lines: { ll: any[]; stroke: string; w: number }[] = [];
+    const collect = (c: any) => {
+      if (!c) return;
+      if (c.getLayers) {
+        (c.getLayers() || []).forEach(collect);
+        return;
+      }
+      const ll = c._latlngs;
+      const o = c.options || {};
+      if (ll && o.color) lines.push({ ll, stroke: o.color, w: o.weight || 3 });
+    };
+    (Object.values(netLayers.current) as any[]).forEach(collect);
+    if (routeRef.current) collect(routeRef.current);
+    const size = map.getSize();
+    const W = 1600;
+    const R = W / size.x;
+    const H = Math.round(size.y * R);
+    const cv = document.createElement("canvas");
+    cv.width = W;
+    cv.height = H;
+    const cx = cv.getContext("2d");
+    if (!cx) return;
+    cx.setTransform(R, 0, 0, R, 0, 0);
+    cx.fillStyle = "#f3f1e8";
+    cx.fillRect(0, 0, W, H);
+    cx.lineCap = "round";
+    cx.lineJoin = "round";
+    for (const ln of lines) {
+      cx.strokeStyle = ln.stroke;
+      cx.lineWidth = ln.w;
+      cx.beginPath();
+      let first = true;
+      const fl = ln.ll;
+      for (let k = 0; k < fl.length; k++) {
+        const p = map.latLngToContainerPoint(fl[k]);
+        if (first) {
+          cx.moveTo(p.x, p.y);
+          first = false;
+        } else {
+          cx.lineTo(p.x, p.y);
+        }
+      }
+      cx.stroke();
+    }
+    const a = document.createElement("a");
+    a.href = cv.toDataURL("image/png");
+    a.download = "nocatee-cart-network.png";
+    a.click();
+  }
+
   // ---- Nocatee Village Drive: always-on bright route highlight ----
   function highlightVillage(L: any, g: CartGraph) {
     const ix = g.names.indexOf("Nocatee Village Drive");
@@ -435,6 +491,18 @@ export default function NavMap({
   }
 
   // ---- netView: hide the basemap so only the routed network shows ----
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady) return;
+    if (exportRef) {
+      exportRef.current = exportPNG;
+      return () => {
+        if (exportRef) exportRef.current = null;
+      };
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapReady]);
+
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapReady) return;
