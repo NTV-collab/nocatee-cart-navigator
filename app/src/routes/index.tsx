@@ -69,6 +69,11 @@ function Index() {
   const [pinNotice, setPinNotice] = useState<string | null>(null);
   const [showSteps, setShowSteps] = useState(false);
   const [netView, setNetView] = useState(false);
+  const [routeOnly, setRouteOnly] = useState(false);
+  useEffect(() => {
+    if (!route) setRouteOnly(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route]);
   const exportRef = useRef<(() => void) | null>(null);
   const locWatch = useRef<number | null>(null);
   const trackingRef = useRef(false);
@@ -390,6 +395,7 @@ function Index() {
           leafletMap.current = m;
         }}
         netView={netView}
+        routeOnly={routeOnly}
         exportRef={exportRef}
       />
 
@@ -504,6 +510,23 @@ function Index() {
             >
               {crosshairIcon}
             </button>
+            {route && (
+              <button
+                onClick={() => setRouteOnly((v) => !v)}
+                aria-label="Route only view"
+                title={routeOnly ? "Show overlays" : "Hide overlays, show route only"}
+                className={
+                  "grid size-11 place-items-center rounded-full border shadow-md transition active:scale-95 " +
+                  (routeOnly ? "border-cn-teal bg-cn-teal text-white" : "border-cn-line bg-white/95 text-cn-ink-soft hover:text-cn-teal-deep")
+                }
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M12 13c2 0 3.5-2 3.5-4a3.5 3.5 0 1 0-7 0C8.5 11 10 13 12 13Z" />
+                  <path d="M12 13v7" />
+                  <path d="M4 4 9 9m6 6 5 5" />
+                </svg>
+              </button>
+            )}
             <button
               onClick={() => setNetView((v) => !v)}
               aria-label={netView ? "Show map" : "Network view"}

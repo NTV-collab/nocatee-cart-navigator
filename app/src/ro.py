@@ -8,8 +8,8 @@ new = "  netView?: boolean;\n  routeOnly?: boolean;\n  onMapReady?: (map: any) =
 assert old in s, "props"
 s = s.replace(old, new, 1)
 
-old = "  netView,\n  onMapReady,\n  exportRef,"
-new = "  netView,\n  routeOnly,\n  onMapReady,\n  exportRef,"
+old = "  netView,\n  exportRef,\n}: Props) {"
+new = "  netView,\n  routeOnly,\n  exportRef,\n}: Props) {"
 assert old in s, "desc"
 s = s.replace(old, new, 1)
 
@@ -37,4 +37,4 @@ assert old in s, "effect"
 s = s.replace(old, new, 1)
 
 open(p, "w").write(s)
-print("navmap routeOnly applied")
+print("navmap routeOnly APPLIED")

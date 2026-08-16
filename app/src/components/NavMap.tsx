@@ -20,6 +20,7 @@ type Props = {
   onMapClick: (p: MapPoint) => void;
   onReady: () => void;
   netView?: boolean;
+  routeOnly?: boolean;
   onMapReady?: (map: any) => void;
   exportRef?: { current: (() => void) | null };
 };
@@ -63,6 +64,7 @@ export default function NavMap({
   onReady,
   onMapReady,
   netView,
+  routeOnly,
   exportRef,
 }: Props) {
   const holder = useRef<HTMLDivElement>(null);
@@ -489,6 +491,24 @@ export default function NavMap({
     }
     return grp;
   }
+
+  // ---- routeOnly: hide every overlay so only the highlighted route + pins show ----
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady) return;
+    const off = (l: any) => l && map.hasLayer(l) && map.removeLayer(l);
+    const on = (l: any) => l && !map.hasLayer(l) && l.addTo(map);
+    const ovs = [
+      netLayers.current.paths,
+      netLayers.current.roads,
+      netLayers.current.forbidden,
+      netLayers.current.highlight,
+      trailsGroup.current,
+      overlayLayer.current,
+    ];
+    (routeOnly ? ovs.forEach(off) : ovs.forEach(on));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routeOnly, mapReady]);
 
   // ---- netView: hide the basemap so only the routed network shows ----
   useEffect(() => {
