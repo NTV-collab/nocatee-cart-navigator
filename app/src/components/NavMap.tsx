@@ -460,8 +460,17 @@ export default function NavMap({
       });
       return L.marker([lat, lng], { icon, interactive: false });
     };
-    if (st) group.addLayer(mk(st.lat, st.lng, "A", "cn-marker-start"));
-    if (en) group.addLayer(mk(en.lat, en.lng, "B", "cn-marker-end"));
+    // pins sit exactly on the route ends so they can never appear detached
+    const rEnd = rt && rt.points.length > 1 ? rt.points[rt.points.length - 1] : null;
+    const rStart = rt && rt.points.length > 1 ? rt.points[0] : null;
+    if (st || rStart) {
+      const aPt = rStart ?? st;
+      if (aPt) group.addLayer(mk(aPt.lat, aPt.lng, "A", "cn-marker-start"));
+    }
+    if (en || rEnd) {
+      const bPt = rEnd ?? en;
+      if (bPt) group.addLayer(mk(bPt.lat, bPt.lng, "B", "cn-marker-end"));
+    }
     if (lp) {
       const ring = L.circle([lp.lat, lp.lng], {
         radius: Math.max(ac ?? 12, 8),
