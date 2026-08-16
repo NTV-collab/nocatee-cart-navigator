@@ -248,7 +248,7 @@ export default function NavMap({
             attributionControl: true,
             preferCanvas: true,
             minZoom: 11,
-            maxZoom: 17,
+            maxZoom: 19,
           }).setView([30.095, -81.414], 13.5);
           mapRef.current = map;
           L.control.zoom({ position: "bottomright" }).addTo(map);
