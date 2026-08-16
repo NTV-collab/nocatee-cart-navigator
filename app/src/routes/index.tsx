@@ -4,7 +4,7 @@ import { loadCartGraph, type CartGraph } from "../lib/cart-data";
 import { CartRouter, type RouteResult, type MapPoint } from "../lib/cart-core";
 import { DESTINATIONS, type Destination } from "../lib/destinations";
 import NavMap from "../components/NavMap";
-import { listTrails, saveTrail } from "../lib/api/trails.functions";
+import { listTrails, saveTrail, upsertTrail } from "../lib/api/trails.functions";
 
 export const Route = createFileRoute("/")({
   component: Index,
@@ -62,9 +62,10 @@ function Index() {
   const [drawing, setDrawing] = useState(false);
   const [draft, setDraft] = useState<MapPoint[]>([]);
   const [saving, setSaving] = useState(false);
-  const [trails, setTrails] = useState<{ id: number; geom: [number, number][]; kind: "path" | "road" }[]>([]);
+  const [trails, setTrails] = useState<{ id: number; name: string; geom: [number, number][]; kind: "path" | "road" }[]>([]);
   const [drawKind, setDrawKind] = useState<"path" | "road">("path");
   const [movePin, setMovePin] = useState(false);
+  const [pinOverrides, setPinOverrides] = useState<Record<string, [number, number]>>({});
   const locWatch = useRef<number | null>(null);
   const trackingRef = useRef(false);
   trackingRef.current = tracking;
@@ -99,19 +100,22 @@ function Index() {
     listTrails()
       .then(({ trails: rows }) => {
         if (!alive) return;
-        const parsed: { id: number; geom: [number, number][]; kind: "path" | "road" }[] = [];
+        const parsed: { id: number; name: string; geom: [number, number][]; kind: "path" | "road" }[] = [];
         for (const r of rows) {
           try {
             const g: unknown = JSON.parse(r.geom);
             if (Array.isArray(g) && g.length > 1 && Array.isArray(g[0])) {
-              parsed.push({ id: r.id, geom: g as [number, number][], kind: r.kind === "road" ? "road" : "path" });
+              parsed.push({ id: r.id, name: r.name ?? "", geom: g as [number, number][], kind: r.kind === "road" ? "road" : "path" });
             }
           } catch {}
         }
         setTrails(parsed);
+        const ov: Record<string, [number, number]> = {};
         for (const t of parsed) {
+          if (t.name && t.geom.length) ov[t.name] = t.geom[0];
           routerRef.current?.addExternalTrail(t.geom, undefined, t.kind === "road");
         }
+        setPinOverrides(ov);
       })
       .catch(() => {});
     return () => {
@@ -178,8 +182,17 @@ function Index() {
   const onMapClick = useCallback(
     (p: MapPoint) => {
       if (movePin) {
-        setEnd((prev) => (prev ? { lat: p.lat, lng: p.lng, label: prev.label } : { lat: p.lat, lng: p.lng }));
+        let label: string | null = null;
+        setEnd((prev) => {
+          label = prev?.label ?? null;
+          return prev ? { lat: p.lat, lng: p.lng, label: prev.label } : { lat: p.lat, lng: p.lng };
+        });
         setMovePin(false);
+        if (label) {
+          try {
+            upsertTrail({ data: { name: label, geom: JSON.stringify([[p.lat, p.lng], [p.lat, p.lng]]) } });
+          } catch {}
+        }
         return;
       }
       if (drawing) {
@@ -243,7 +256,10 @@ function Index() {
   const pickDestination = useCallback(
     (d: Destination, target?: "start" | "end") => {
       const t = target ?? pickMode;
-      const pt: MapPoint = { lat: d.lat, lng: d.lng, label: d.name };
+      const ov = pinOverrides[d.name];
+      const pt: MapPoint = ov
+        ? { lat: ov[0], lng: ov[1], label: d.name }
+        : { lat: d.lat, lng: d.lng, label: d.name };
       if (t === "start") {
         setStart(pt);
         setSearchTarget("end");
@@ -256,7 +272,7 @@ function Index() {
       }
       setSearch("");
     },
-    [pickMode, start, locateMe],
+    [pickMode, start, locateMe, pinOverrides],
   );
 
   const clearAll = useCallback(() => {
@@ -294,7 +310,7 @@ function Index() {
       const geo = draft.map((p) => [p.lat, p.lng]) as [number, number][];
       await saveTrail({ data: { geom: JSON.stringify(geo), kind: drawKind } });
       routerRef.current?.addExternalTrail(geo, undefined, drawKind === "road");
-      setTrails((prev) => [...prev, { id: Date.now(), geom: geo, kind: drawKind }]);
+      setTrails((prev) => [...prev, { id: Date.now(), name: "", geom: geo, kind: drawKind }]);
       setDraft([]);
       setDrawing(false);
     } finally {

@@ -37,6 +37,24 @@ export const saveTrail = createServerFn({ method: "POST" })
     return { id: Number(res.meta.last_row_id) };
   });
 
+
+
+export const upsertTrail = createServerFn({ method: "POST" })
+  .inputValidator(
+    z.object({
+      name: z.string().min(1).max(120),
+      geom: z.string().min(10).max(500000),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const { DB } = bindings();
+    if (!DB) throw new Error("database unavailable");
+    await DB.prepare("DELETE FROM trails WHERE name = ?").bind(data.name).run();
+    await DB.prepare("INSERT INTO trails (name, geom, kind) VALUES (?, ?, 'path')")
+      .bind(data.name, data.geom)
+      .run();
+    return { ok: true };
+  });
 export const deleteTrail = createServerFn({ method: "POST" })
   .inputValidator(z.object({ id: z.number() }))
   .handler(async ({ data }) => {
