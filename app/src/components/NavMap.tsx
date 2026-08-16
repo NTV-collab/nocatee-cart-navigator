@@ -417,6 +417,7 @@ export default function NavMap({
       if (ll && o.color) lines.push({ ll, stroke: o.color, w: o.weight || 3 });
     };
     (Object.values(netLayers.current) as any[]).forEach(collect);
+    if (routeGroup.current) collect(routeGroup.current);
     if (routeRef.current) collect(routeRef.current);
     const size = map.getSize();
     const W = 1600;
