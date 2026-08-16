@@ -418,7 +418,8 @@ function Index() {
                 <div className="flex items-center justify-between gap-3 px-4 pt-3">
                   <div className="flex items-center gap-2">
                     <span className="grid size-7 place-items-center rounded-full bg-cn-teal text-[11px] font-semibold text-white">CN</span>
-                    <span className="text-[14px] font-semibold tracking-tight">Nocatee Cart Navigator</span>
+                    <span className="text-[14px] font-semibold tracking-tight text-cn-ink">Nocatee Cart Navigator</span>
+                    
                   </div>
                   <span className="hidden font-mono text-[9px] uppercase tracking-[0.18em] text-cn-ink-soft sm:block">EV path GPS</span>
                 </div>
