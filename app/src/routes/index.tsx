@@ -68,6 +68,7 @@ function Index() {
   const [pinOverrides, setPinOverrides] = useState<Record<string, [number, number]>>({});
   const [pinNotice, setPinNotice] = useState<string | null>(null);
   const [showSteps, setShowSteps] = useState(false);
+  const [netView, setNetView] = useState(false);
   const locWatch = useRef<number | null>(null);
   const trackingRef = useRef(false);
   trackingRef.current = tracking;
@@ -387,6 +388,7 @@ function Index() {
         onMapReady={(m) => {
           leafletMap.current = m;
         }}
+        netView={netView}
       />
 
       {/* location feedback banner */}
@@ -499,6 +501,22 @@ function Index() {
               }
             >
               {crosshairIcon}
+            </button>
+            <button
+              onClick={() => setNetView((v) => !v)}
+              aria-label={netView ? "Show map" : "Network view"}
+              title={netView ? "Show map" : "Show only the network"}
+              className={
+                "grid size-11 place-items-center rounded-full border shadow-md transition active:scale-95 " +
+                (netView ? "border-cn-teal bg-cn-teal text-white" : "border-cn-line bg-white/95 text-cn-ink-soft hover:text-cn-teal-deep")
+              }
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <circle cx="6" cy="6" r="2.2" />
+                <circle cx="18" cy="6" r="2.2" />
+                <circle cx="12" cy="18" r="2.2" />
+                <path d="M7.8 7 10.5 16M16.2 7l-3.2 9" />
+              </svg>
             </button>
             <div className="flex flex-col gap-1 rounded-full border border-cn-line bg-white/95 p-1 shadow-md">
               <button
