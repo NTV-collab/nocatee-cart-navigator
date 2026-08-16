@@ -67,6 +67,7 @@ function Index() {
   const [movePin, setMovePin] = useState(false);
   const [pinOverrides, setPinOverrides] = useState<Record<string, [number, number]>>({});
   const [pinNotice, setPinNotice] = useState<string | null>(null);
+  const [showSteps, setShowSteps] = useState(false);
   const locWatch = useRef<number | null>(null);
   const trackingRef = useRef(false);
   trackingRef.current = tracking;
@@ -626,6 +627,12 @@ function Index() {
                         {movePin ? "Tap map to move pin..." : "Move pin"}
                       </button>
                       <button
+                        onClick={() => setShowSteps(true)}
+                        className="text-[12px] font-medium text-cn-ink-soft underline decoration-cn-line underline-offset-4 hover:text-cn-teal-deep"
+                      >
+                        Turns
+                      </button>
+                      <button
                         onClick={clearAll}
                         className="text-[12px] font-medium text-cn-ink-soft underline decoration-cn-line underline-offset-4 hover:text-cn-teal-deep"
                       >
@@ -682,12 +689,20 @@ function Index() {
                     <span className="ml-2 text-[13px] font-normal text-cn-ink-soft">about {route.minutes} min</span>
                   </p>
                 </div>
-                <button
-                  onClick={endDrive}
-                  className="rounded-full border border-cn-line bg-white px-4 py-2 text-[13px] font-semibold text-cn-ink-soft transition hover:border-cn-clay hover:text-cn-clay active:scale-95"
-                >
-                  End Drive
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setShowSteps(true)}
+                    className="rounded-full border border-cn-line bg-white px-4 py-2 text-[13px] font-semibold text-cn-ink transition hover:text-cn-teal-deep active:scale-95"
+                  >
+                    Turns
+                  </button>
+                  <button
+                    onClick={endDrive}
+                    className="rounded-full border border-cn-line bg-white px-4 py-2 text-[13px] font-semibold text-cn-ink-soft transition hover:border-cn-clay hover:text-cn-clay active:scale-95"
+                  >
+                    End Drive
+                  </button>
+                </div>
               </div>
               {route.steps[0] && (
                 <p className="mt-2 flex items-center gap-2 rounded-xl bg-cn-mist px-3 py-2 text-[14px] font-medium text-cn-ink">
@@ -711,6 +726,67 @@ function Index() {
             </div>
           </div>
         </>
+      )}
+
+      {showSteps && route && (
+        <div className="absolute inset-0 z-[800] flex items-end justify-center bg-cn-ink/40 backdrop-blur-[1px] sm:items-center sm:pb-0">
+          <div className="flex max-h-[85dvh] w-full max-w-xl flex-col overflow-hidden rounded-t-2xl bg-cn-paper shadow-2xl">
+            <div className="flex items-center justify-between border-b border-cn-line px-4 py-3">
+              <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-cn-ink-soft">
+                Turn by turn · {route.steps.length} steps
+              </p>
+              <button
+                onClick={() => setShowSteps(false)}
+                aria-label="Close turn-by-turn"
+                className="grid size-8 place-items-center rounded-full text-cn-ink-soft transition hover:bg-cn-sand-deep hover:text-cn-ink"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
+                  <path d="m6 6 12 12M18 6 6 18" />
+                </svg>
+              </button>
+            </div>
+            <ol className="space-y-3 overflow-y-auto px-4 py-4">
+              {route.steps.map((st, i) => (
+                <li key={i} className="flex items-start gap-3">
+                  <span
+                    className={
+                      "mt-0.5 shrink-0 rounded-full px-2.5 py-1 font-mono text-[10px] " +
+                      (st.kind === "arrive"
+                        ? "bg-cn-ink text-white"
+                        : st.kind === "turn"
+                          ? "bg-cn-mist text-cn-teal-deep"
+                          : st.kind === "cross"
+                            ? "bg-cn-sand-deep text-cn-clay"
+                            : "bg-cn-mist text-cn-ink-soft")
+                    }
+                  >
+                    {st.kind === "arrive" ? "OK" : i + 1}
+                  </span>
+                  <span className="text-[13px] leading-snug text-cn-ink">
+                    {st.text}
+                    {st.dist > 0 && (
+                      <span className="ml-2 font-mono text-[11px] text-cn-ink-soft">{fmtMeters(st.dist)}</span>
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ol>
+            <div className="flex items-center justify-between border-t border-cn-line px-4 py-3 text-[12px] text-cn-ink-soft">
+              <span>
+                {fmtMeters(route.meters)} · about {route.minutes} min
+              </span>
+              <button
+                onClick={() => {
+                  setShowSteps(false);
+                  clearAll();
+                }}
+                className="font-medium text-cn-ink-soft underline decoration-cn-line underline-offset-4 hover:text-cn-teal-deep"
+              >
+                Clear route
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* tiny attribution line */}
