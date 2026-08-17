@@ -25,7 +25,7 @@ export const DESTINATIONS: Destination[] = [
   { name: "Valley Ridge Academy", sub: "School on the west side", lat: 30.09867, lng: -81.45477, zone: "west", group: "schools" },
   { name: "Allen D. Nease High School", sub: "School on the west side", lat: 30.07942, lng: -81.44765, zone: "west", group: "schools" },
   { name: "Palm Valley Golf Club", sub: "Golf and dining", lat: 30.10135, lng: -81.43561, zone: "west", group: "pools & clubs" },
-  { name: "Cypress Park Pool", sub: "Pool on the west side", lat: 30.11511, lng: -81.45579, zone: "west", group: "pools & clubs" },
+  { name: "Cypress Park Pool", sub: "Pool on the west side", lat: 30.115640, lng: -81.455794, zone: "west", group: "pools & clubs" },
   { name: "Saint John Paul II Church", sub: "Worship on the west side", lat: 30.12303, lng: -81.43508, zone: "west", group: "venues" },
 
   { name: "Nocatee Fitness Club", sub: "Fitness center & gym", lat: 30.10318, lng: -81.41554, zone: "east", group: "pools & clubs" },
