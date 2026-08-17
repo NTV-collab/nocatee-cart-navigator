@@ -57,4 +57,9 @@ export const DESTINATIONS: Destination[] = [
   { name: 'The Link (Innovation & Activity Hub)', sub: 'Hub', lat: 30.109624, lng: -81.419238, zone: 'east', group: 'venues' },
 
   { name: "Settler's Pond", sub: "Pond & park loop", lat: 30.050470, lng: -81.402303, zone: "east", group: "water & parks" },
+
+  { name: "Salata", sub: "641 Crosswater Pkwy · build-your-own salad", lat: 30.108333, lng: -81.415556, zone: "east", group: "food & shops" },
+  { name: "Panera Bread", sub: "Nocatee Town Center", lat: 30.110457, lng: -81.418001, zone: "east", group: "food & shops" },
+  { name: "Really Good Beer Stop", sub: "295 Pine Lake Dr · craft beer & taps", lat: 30.110691, lng: -81.415990, zone: "east", group: "food & shops" },
+  { name: "Ben & Jerry's", sub: "295 Pine Lake Dr · ice cream", lat: 30.110681, lng: -81.415933, zone: "east", group: "food & shops" },
 ];
