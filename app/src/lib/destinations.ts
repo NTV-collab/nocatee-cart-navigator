@@ -30,7 +30,7 @@ export const DESTINATIONS: Destination[] = [
 
   { name: "Nocatee Fitness Club", sub: "Fitness center & gym", lat: 30.10318, lng: -81.41554, zone: "east", group: "pools & clubs" },
     { name: "Lap Pool", sub: "Lap swimming lanes", lat: 30.101855, lng: -81.415933, zone: "east", group: "water & parks" },
-  { name: "Nocatee Welcome Center", sub: "245 Nocatee Center Way", lat: 30.1088, lng: -81.4203, zone: "east", group: "venues" },
+  { name: "Nocatee Welcome Center", sub: "245 Nocatee Center Way", lat: 30.103266, lng: -81.414941, zone: "east", group: "venues" },
   { name: "Nocatee Resident Services", sub: "245 Nocatee Center Way", lat: 30.1086, lng: -81.4202, zone: "east", group: "venues" },
   { name: "Orangetheory Fitness", sub: "Town Center studio", lat: 30.10972, lng: -81.41809, zone: "east", group: "pools & clubs" },
   { name: "Crosswater & Preservation Roundabout", sub: "Trail junction", lat: 30.1062, lng: -81.4248, zone: "east", group: "venues" },
