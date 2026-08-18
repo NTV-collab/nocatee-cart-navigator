@@ -62,4 +62,10 @@ export const DESTINATIONS: Destination[] = [
   { name: "Panera Bread", sub: "Nocatee Town Center", lat: 30.110457, lng: -81.418001, zone: "east", group: "food & shops" },
   { name: "Really Good Beer Stop", sub: "295 Pine Lake Dr · craft beer & taps", lat: 30.110691, lng: -81.415990, zone: "east", group: "food & shops" },
   { name: "Ben & Jerry's", sub: "295 Pine Lake Dr · ice cream", lat: 30.110681, lng: -81.415933, zone: "east", group: "food & shops" },
+
+  { name: "Tank's Sushi Bistro", sub: "Town Center · sushi & ramen", lat: 30.108609, lng: -81.415643, zone: "east", group: "food & shops" },
+  { name: "Tillman's Meats & Country Store", sub: "West · meats & provisions", lat: 30.081325, lng: -81.454042, zone: "west", group: "food & shops" },
+  { name: "fit20", sub: "466 Town Plaza Ave · strength studio", lat: 30.109018, lng: -81.421466, zone: "east", group: "pools & clubs" },
+  { name: "Truist Bank", sub: "215 Pine Lake Dr · at Publix", lat: 30.109492, lng: -81.415740, zone: "east", group: "food & shops" },
+  { name: "Baggett Law", sub: "480 Town Plaza Ave · personal injury", lat: 30.108726, lng: -81.421210, zone: "east", group: "venues" },
 ];
