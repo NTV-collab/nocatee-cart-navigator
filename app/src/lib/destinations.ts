@@ -68,4 +68,7 @@ export const DESTINATIONS: Destination[] = [
   { name: "fit20", sub: "466 Town Plaza Ave · strength studio", lat: 30.109018, lng: -81.421466, zone: "east", group: "pools & clubs" },
   { name: "Truist Bank", sub: "215 Pine Lake Dr · at Publix", lat: 30.109492, lng: -81.415740, zone: "east", group: "food & shops" },
   { name: "Baggett Law", sub: "480 Town Plaza Ave · personal injury", lat: 30.108726, lng: -81.421210, zone: "east", group: "venues" },
+
+  { name: "Twenty Mile Park", sub: "Park on the 20-Mile boundary", lat: 30.130240, lng: -81.422716, zone: "east", group: "water & parks" },
+  { name: "Twenty Mile Post", sub: "Historic 20-Mile fire lookout post", lat: 30.131367, lng: -81.411996, zone: "east", group: "venues" },
 ];
