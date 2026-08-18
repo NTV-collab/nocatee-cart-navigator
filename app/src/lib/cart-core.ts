@@ -27,13 +27,15 @@ export class CartRouter {
   constructor(private g: CartGraph) {
     this.nodes = g.nodes;
     this.adj = Array.from({ length: g.nodes.length / 2 }, () => []);
+    const FORBIDDEN = new Set(["preservation trail"]);
     for (let i = 0; i < g.edgesA.length; i++) {
       const a = g.edgesA[i];
       const b = g.edgesB[i];
       const w = g.edgesW[i];
       const path = g.edgesPath[i] === 1;
       const nameIdx = g.edgesNameIdx[i];
-      // trails cost least; named streets a little; unnamed cut-throughs a lot
+      if (nameIdx >= 0 && FORBIDDEN.has(g.names[nameIdx].toLowerCase())) continue;
+      // trails cost least; named streets cost slightly; unnamed cut-throughs a lot
       // connectors (unnamed short roads I generated to cross arterials) can poke
       // across fields/roads: keep only short ones and make them a last resort.
       if (!path && nameIdx < 0 && w > 60) continue;
