@@ -167,7 +167,7 @@ function cartNearest(lat,lng){
 function dijkstraCart(s,t,adj){
   const N=compOf.length,dist=new Float64Array(N).fill(1e18),prev=new Int32Array(N).fill(-1);
   dist[s]=0;const pq=[[0,s]];
-  while(pq.length){pq.sort((a,b)=>a[0]-b[0]);const u=pq.shift()[0];if(u===t)break;
+  while(pq.length){pq.sort((a,b)=>a[0]-b[0]);const u=pq.shift()[1];if(u===t)break;
     for(const[v,w]of adj[u]){const nd=dist[u]+w;if(nd<dist[v]){dist[v]=nd;prev[v]=u;pq.push([nd,v]);}}
   }
   if(dist[t]>=1e17)return null;
