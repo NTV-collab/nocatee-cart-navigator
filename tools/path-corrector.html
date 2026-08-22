@@ -36,12 +36,10 @@
   <button id="export" disabled>Export corrected graph.json</button>
   <div class="stat" id="stat">loading graph…</div>
   <div class="legend">
-    <span class="pill" style="background:#1f9d55"></span>trail
-    <span class="pill" style="background:#43618c"></span>shared
-    <span class="pill" style="background:#b4b0a6"></span>street
-    <span class="pill" style="background:#8fc7a3"></span>unnamed
-    <span class="pill" style="background:#d35f4e"></span>not permitted<br/>
-    <span class="pill" style="background:#1e88e5"></span>route · <b>Fix mode:</b> click a point to grab, click the map to move it.
+    <span class="pill" style="background:#1f9d55"></span>trail (cart)
+    <span class="pill" style="background:#2e7d32"></span>EV-approved roadway
+    <span class="pill" style="background:#d8d8d8"></span>not in cart network<br/>
+    Routes use <b>only</b> green trails + dark-green EV roadways.
   </div>
 </div>
 <script>
@@ -81,13 +79,20 @@ function snapPointToNetwork(lat,lng){
   return best;
 }
 
+function isCartLegal(i){
+  // Cart-driving network = trails (edgesPath=1) + EV-approved roadways (SHARED). Everything else ignored.
+  const ni=G.edgesNameIdx[i];
+  if(ni>=0&&FORBIDDEN.has(G.names[ni].toLowerCase()))return false;
+  if(G.edgesPath[i]===1)return true;                 // green trail
+  if(ni>=0&&SHARED.has(G.names[ni].toLowerCase()))return true; // dark-green EV roadway
+  return false;
+}
 function buildAdj(){
   const N=G.nodes.length/2,adj=Array.from({length:N},()=>[]);
   for(let i=0;i<G.edgesA.length;i++){
+    if(!isCartLegal(i))continue;
     const a=G.edgesA[i],b=G.edgesB[i],w=G.edgesW[i],path=G.edgesPath[i]===1,ni=G.edgesNameIdx[i];
-    if(ni>=0&&FORBIDDEN.has(G.names[ni].toLowerCase()))continue;
-    if(!path&&ni<0&&w>60)continue;
-    const cost=path?w:ni>=0?Math.round(w*1.2):Math.round(w*5);
+    const cost=path?w:Math.round(w*1.2);
     adj[a].push([b,cost]);adj[b].push([a,cost]);
   }return adj;
 }
@@ -106,22 +111,18 @@ function edgeNameOf(a,b){
 function drawNetwork(){
   if(network){map.removeLayer(network);}
   network=L.layerGroup().addTo(map);
-  const segs={road:[],shared:[],green:[],light:[],village:[],forb:[]};
+  const segs={trail:[],ev:[],other:[]};
   for(let i=0;i<G.edgesA.length;i++){
-    const a=G.edgesA[i],b=G.edgesB[i],la=G.nodes[a*2],lo=G.nodes[a*2+1],lb=G.nodes[b*2],lj=G.nodes[b*2+1];
-    const nil=G.edgesNameIdx[i],nm=nil>=0?G.names[nil].toLowerCase():"";
-    let k;
-    if(nil<0)k="light";
-    else if(nm===VILLAGE)k="village";
-    else if(SHARED.has(nm))k="shared";
-    else if(G.edgesPath[i]===0)k="road";
-    else k="green";
-    segs[k].push([[lo,la],[lj,lb]]);
+    const a=G.edgesA[i],b=G.edgesB[i];
+    const p=[[G.nodes[a*2+1],G.nodes[a*2]],[G.nodes[b*2+1],G.nodes[b*2]]];
+    if(isCartLegal(i)) segs[G.edgesPath[i]===1?"trail":"ev"].push(p);
+    else segs.other.push(p);
   }
-  const colors={road:"#b4b0a6",shared:"#43618c",green:"#1f9d55",light:"#8fc7a3",village:"#1e88e5",forb:"#d35f4e"};
-  const widths={road:2,shared:3,green:3,light:1.5,village:4,forb:2};
-  for(const k of Object.keys(colors)){segs[k].forEach(([p,q])=>L.polyline([p,q],{color:colors[k],weight:widths[k],opacity:.9}).addTo(network));}
-  (G.forbidden||[]).forEach(ch=>{const pts=ch.map(p=>[p[1],p[0]]);L.polyline(pts,{color:"#d35f4e",weight:2,opacity:.7,dashArray:"4 4"}).addTo(network);});
+  // cart-driving network only: green trails + dark-green EV roadways
+  segs.trail.forEach(p=>L.polyline(p,{color:"#1f9d55",weight:3,opacity:.95}).addTo(network));
+  segs.ev.forEach(p=>L.polyline(p,{color:"#2e7d32",weight:4,opacity:.95}).addTo(network));
+  // everything else is NOT part of the cart network — draw faint so the coverage gap reads clearly
+  segs.other.forEach(p=>L.polyline(p,{color:"#d8d8d8",weight:1.5,opacity:.5}).addTo(network));
 }
 function ensureNetwork(){drawNetwork();}
 function drawRoute(path){
@@ -190,7 +191,8 @@ exportBtn.onclick=()=>{
 fetch(GRAPH_URL).then(r=>{if(!r.ok)throw new Error("HTTP "+r.status);return r.json();})
   .then(g=>{G=g;const b=g.bbox||null;ensureNetwork();
     if(b){map.fitBounds([[b[0],b[1]],[b[2],b[3]]],{padding:[20,20]});}
-    stat.textContent="graph loaded: "+(g.nodes.length/2)+" nodes · "+g.edgesA.length+" edges · "+g.names.length+" names";
+    let cartEdges=0;for(let i=0;i<g.edgesA.length;i++)if(isCartLegal(i))cartEdges++;
+    stat.textContent="cart network: "+cartEdges+" legal edges · "+(g.edgesA.length-cartEdges)+" not-in-network";
   }).catch(e=>{stat.textContent="ERROR loading graph: "+e.message;msg.textContent="Graph failed to load — check the path to ../app/public/data/graph.json";});
 </script>
 </body>
