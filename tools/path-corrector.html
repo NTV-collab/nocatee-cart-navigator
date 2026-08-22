@@ -55,13 +55,31 @@ const map = L.map("map",{zoomSnap:.5}).setView([30.10,-81.42],13);
 L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",{attribution:"&copy; OpenStreetMap &copy; CARTO"}).addTo(map);
 
 let network=null, routeLayer=null, markA=null, markB=null;
-let mode="test", selNode=null, fixes={};
+let mode="test", selNode=null, fixes={}, snapPreview=null;
 const msg=document.getElementById("hint"), stat=document.getElementById("stat");
 const fixBtn=document.getElementById("mFix"), testBtn=document.getElementById("mTest");
 const exportBtn=document.getElementById("export");
 
 function hav(a,b){const R=6371000,p1=a[0]*Math.PI/180,p2=b[0]*Math.PI/180,dp=(b[0]-a[0])*Math.PI/180,dl=(b[1]-a[1])*Math.PI/180;
   const x=Math.sin(dp/2)**2+Math.cos(p1)*Math.cos(p2)*Math.sin(dl/2)**2;return 2*R*Math.asin(Math.sqrt(x));}
+// Snap a click to the nearest point ON any graph line (trail/street/shared),
+// so a moved node lands on the network instead of in open space.
+function snapPointToNetwork(lat,lng){
+  const cos=Math.max(1e-9,Math.cos(lat*Math.PI/180));
+  let best={lat:lat,lng:lng,d:1e18};
+  for(let i=0;i<G.edgesA.length;i++){
+    const a=G.edgesA[i],b=G.edgesB[i];
+    const ax=G.nodes[a*2+1]*cos, ay=G.nodes[a*2];
+    const bx=G.nodes[b*2+1]*cos, by=G.nodes[b*2];
+    const abx=bx-ax, aby=by-ay;
+    const len2=abx*abx+aby*aby;
+    let t=0;if(len2>1e-12){t=((lng*cos-ax)*abx+(lat-ay)*aby)/len2;t=t<0?0:t>1?1:t;}
+    const dx=lng*cos-(ax+abx*t), dy=lat-(ay+aby*t);
+    const d=dx*dx+dy*dy;
+    if(d<best.d)best={lat:ay+aby*t,lng:(ax+abx*t)/cos,d};
+  }
+  return best;
+}
 
 function buildAdj(){
   const N=G.nodes.length/2,adj=Array.from({length:N},()=>[]);
@@ -142,18 +160,28 @@ map.on("click",e=>{
       stat.textContent="node "+selNode+" grabbed — click where it should be.";
       return;
     }
-    // move node to click
-    G.nodes[selNode*2]=e.latlng.lat;G.nodes[selNode*2+1]=e.latlng.lng;
-    fixes[selNode]=[e.latlng.lat,e.latlng.lng];
+    // move node, snapping to the nearest graph line
+    const s=snapPointToNetwork(e.latlng.lat,e.latlng.lng);
+    G.nodes[selNode*2]=s.lat;G.nodes[selNode*2+1]=s.lng;
+    fixes[selNode]=[s.lat,s.lng];
     selNode=null;
+    if(snapPreview){map.removeLayer(snapPreview);snapPreview=null;}
     stat.textContent="moved node @"+Object.keys(fixes).length+" point(s). Export when done.";
     exportBtn.disabled=false;
     drawNetwork();
     if(routeLayer)map.removeLayer(routeLayer);
   }
 });
-fixBtn.onclick=()=>{mode="fix";fixBtn.classList.add("on");testBtn.classList.remove("on");selNode=null;msg.textContent="Fix mode: click a point on a line, then click where it belongs (within ~60 m).";};
-testBtn.onclick=()=>{mode="test";testBtn.classList.add("on");fixBtn.classList.remove("on");lastStart=null;msg.textContent="Test mode: click start, then destination.";};
+// live snap-target preview while dragging a node in Fix mode
+map.on("mousemove",e=>{
+  if(mode!=="fix"||selNode===null)return;
+  const s=snapPointToNetwork(e.latlng.lat,e.latlng.lng);
+  if(!snapPreview){snapPreview=L.circleMarker([s.lat,s.lng],{radius:6,color:"#fff",weight:2,fillColor:"#2fae9a",fillOpacity:.95,interactive:false}).addTo(map);}
+  else snapPreview.setLatLng([s.lat,s.lng]);
+});
+const clearPreview=()=>{if(snapPreview){map.removeLayer(snapPreview);snapPreview=null;}};
+fixBtn.onclick=()=>{mode="fix";fixBtn.classList.add("on");testBtn.classList.remove("on");selNode=null;clearPreview();msg.textContent="Fix mode: click a node, then click where it should land — it snaps to the nearest trail/street.";};
+testBtn.onclick=()=>{mode="test";testBtn.classList.add("on");fixBtn.classList.remove("on");lastStart=null;clearPreview();msg.textContent="Test mode: click start, then destination.";};
 exportBtn.onclick=()=>{
   const blob=new Blob([JSON.stringify(G)],{type:"application/json"});
   const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="graph.json";
