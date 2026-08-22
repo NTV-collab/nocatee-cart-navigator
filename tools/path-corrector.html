@@ -94,7 +94,7 @@ function evStats(){
   const sz=computeComponents();
   const multi=sz.filter(n=>n>1).length;
   const big=sz.length?Math.max(...sz):0;
-  stat.textContent="clusters: "+multi+" · biggest "+big+" nodes · EV roads: "+(SHARED.size+evSet.size)+" (+"+evSet.size+" you added)";
+  stat.textContent="clusters: "+multi+" · biggest "+big+" nodes · EV roads: "+(EV_NAMES.size+evSet.size)+" (+"+evSet.size+" user)";
 }
 function drawNetwork(){
   if(network){map.removeLayer(network);}
