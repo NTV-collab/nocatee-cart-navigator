@@ -9,8 +9,15 @@
 <style>
   html,body{margin:0;height:100%;font-family:system-ui,sans-serif;background:#111;color:#e6e6e6}
   #map{position:fixed;inset:0;background:#e5e0d5}
-  #panel{position:fixed;top:10px;left:10px;z-index:1000;width:300px;max-height:88vh;overflow:auto;
-    background:rgba(20,20,20,.93);border:1px solid #333;border-radius:10px;padding:12px}
+  #panel{position:fixed;top:10px;left:10px;z-index:1000;width:min(320px,92vw);max-height:88vh;overflow:auto;
+    background:rgba(20,20,20,.93);border:1px solid #333;border-radius:10px;padding:10px;font-size:12px}
+  #panel.collapsed{height:auto;max-height:none;overflow:hidden;padding:6px 10px;cursor:pointer}
+  #panel.collapsed .mode,#panel.collapsed label.tgl,#panel.collapsed #gapsList,#panel.collapsed #gapActions,#panel.collapsed #export,#panel.collapsed .legend,#panel.collapsed #btnHide{display:none!important}
+  #panel.collapsed h1{margin:0;font-size:14px}
+  #btnHide{background:#222;border:1px solid #444;color:#ccc;border-radius:5px;padding:2px 6px;font-size:11px;float:right}
+  .mode{display:flex;gap:5px;margin:6px 0}
+  .mode button{flex:1;background:#222;color:#ccc;border:1px solid #444;border-radius:6px;padding:6px;cursor:pointer;font-size:12px}
+  .mode button.on{background:#2e7d32;border-color:#2e7d32;color:#fff}
   h1{font-size:15px;margin:0 0 8px;color:#4caf50}
   .mode{display:flex;gap:6px;margin:8px 0}
   .mode button{flex:1;background:#222;color:#ccc;border:1px solid #444;border-radius:6px;padding:6px;cursor:pointer}
@@ -28,7 +35,7 @@
 <body>
 <div id="map"></div>
 <div id="panel">
-  <h1>🛺 Nocatee Cart Network — confirm &amp; correct</h1>
+  <h1>🛺 Nocatee Cart Network — confirm &amp; correct <button id="btnHide" title="collapse">–</button></h1>
   <div class="mode">
     <button id="mTest" class="on">Test route</button>
     <button id="mFix">Fix points</button>
@@ -67,6 +74,9 @@ const msg=document.getElementById("hint"), stat=document.getElementById("stat");
 const fixBtn=document.getElementById("mFix"), testBtn=document.getElementById("mTest");
 const exportBtn=document.getElementById("export"), showOthersCb=document.getElementById("showOthers");
 const classifyCb=document.getElementById("classifyMode");
+const panelEl=document.getElementById("panel");
+btnHide.addEventListener("click",e=>{e.stopPropagation();panelEl.classList.toggle("collapsed");btnHide.textContent=panelEl.classList.contains("collapsed")?"+":"–";});
+panelEl.addEventListener("click",e=>{ if(panelEl.classList.contains("collapsed")&&!e.target.closest("button")){panelEl.classList.remove("collapsed");btnHide.textContent="–";} });
 
 function hav(a,b){const R=6371000,p1=a[0]*Math.PI/180,p2=b[0]*Math.PI/180,dp=(b[0]-a[0])*Math.PI/180,dl=(b[1]-a[1])*Math.PI/180;
   const x=Math.sin(dp/2)**2+Math.cos(p1)*Math.cos(p2)*Math.sin(dl/2)**2;return 2*R*Math.asin(Math.sqrt(x));}
