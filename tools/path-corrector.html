@@ -217,6 +217,7 @@ classifyCb.onchange=()=>{if(G){ensureNetwork();msg.textContent=classifyCb.checke
 exportBtn.onclick=()=>{
   const out=JSON.parse(JSON.stringify(G));
   out.user_ev_roads=Array.from(evSet);
+  out.user_gap_status=(GAPS||[]).filter(g=>g.status!=='open').map(g=>({i:g.i,j:g.j,status:g.status,d:g.d}));
   const blob=new Blob([JSON.stringify(out)],{type:"application/json"});
   const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="graph.json";a.click();
   exportBtn.disabled=true;stat.textContent="exported (incl. "+evSet.size+" user EV roads) — bring this file back.";
