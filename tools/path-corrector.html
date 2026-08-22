@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Nocatee Path Corrector</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  html,body{margin:0;height:100%;font-family:system-ui,sans-serif;background:#111;color:#e6e6e6}
+  #map{position:fixed;inset:0}
+  #panel{position:fixed;top:10px;left:10px;z-index:1000;width:300px;max-height:86vh;overflow:auto;
+    background:rgba(20,20,20,.92);border:1px solid #333;border-radius:10px;padding:12px}
+  h1{font-size:15px;margin:0 0 8px;color:#2fae9a}
+  .mode{display:flex;gap:6px;margin:8px 0}
+  .mode button{flex:1;background:#222;color:#ccc;border:1px solid #444;border-radius:6px;padding:6px;cursor:pointer}
+  .mode button.on{background:#2fae9a;border-color:#2fae9a;color:#062}
+  button{padding:6px 10px;border-radius:6px;border:none;cursor:pointer;font-size:13px}
+  #export{background:#2fae9a;color:#062;font-weight:600;width:100%;margin-top:8px}
+  #export:disabled{background:#333;color:#777;cursor:not-allowed}
+  .out{font-size:12px;color:#bbb;white-space:pre-wrap;margin-top:8px;max-height:40vh;overflow:auto}
+  .stat{font-size:11px;color:#888;margin-top:6px}
+  .legend{font-size:10px;color:#aaa;margin-top:8px;line-height:1.5}
+  .pill{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="panel">
+  <h1>⛳ Nocatee Cart Path Corrector</h1>
+  <div class="mode">
+    <button id="mTest" class="on">Test route</button>
+    <button id="mFix">Fix points</button>
+  </div>
+  <div id="hint" class="out">Test mode: click a start, then a destination → run Dijkstra (legal-paths only).</div>
+  <button id="export" disabled>Export corrected graph.json</button>
+  <div class="stat" id="stat">loading graph…</div>
+  <div class="legend">
+    <span class="pill" style="background:#1f9d55"></span>trail
+    <span class="pill" style="background:#43618c"></span>shared
+    <span class="pill" style="background:#b4b0a6"></span>street
+    <span class="pill" style="background:#8fc7a3"></span>unnamed
+    <span class="pill" style="background:#d35f4e"></span>not permitted<br/>
+    <span class="pill" style="background:#1e88e5"></span>route · <b>Fix mode:</b> click a point to grab, click the map to move it.
+  </div>
+</div>
+<script>
+const GRAPH_URL = new URL("../app/public/data/graph.json", location.href).href;
+const SHARED = new Set(["marketside avenue","capital green drive","settlement drive","nocatee village drive","majestic eagle drive","myrtle brook bend","stately shoals trail","willow bay drive"]);
+const VILLAGE = "nocatee village drive";
+const FORBIDDEN = new Set(["preservation trail"]);
+
+let G=null;
+const map = L.map("map",{zoomSnap:.5}).setView([30.10,-81.42],13);
+L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",{attribution:"&copy; OpenStreetMap &copy; CARTO"}).addTo(map);
+
+let network=null, routeLayer=null, markA=null, markB=null;
+let mode="test", selNode=null, fixes={};
+const msg=document.getElementById("hint"), stat=document.getElementById("stat");
+const fixBtn=document.getElementById("mFix"), testBtn=document.getElementById("mTest");
+const exportBtn=document.getElementById("export");
+
+function hav(a,b){const R=6371000,p1=a[0]*Math.PI/180,p2=b[0]*Math.PI/180,dp=(b[0]-a[0])*Math.PI/180,dl=(b[1]-a[1])*Math.PI/180;
+  const x=Math.sin(dp/2)**2+Math.cos(p1)*Math.cos(p2)*Math.sin(dl/2)**2;return 2*R*Math.asin(Math.sqrt(x));}
+
+function buildAdj(){
+  const N=G.nodes.length/2,adj=Array.from({length:N},()=>[]);
+  for(let i=0;i<G.edgesA.length;i++){
+    const a=G.edgesA[i],b=G.edgesB[i],w=G.edgesW[i],path=G.edgesPath[i]===1,ni=G.edgesNameIdx[i];
+    if(ni>=0&&FORBIDDEN.has(G.names[ni].toLowerCase()))continue;
+    if(!path&&ni<0&&w>60)continue;
+    const cost=path?w:ni>=0?Math.round(w*1.2):Math.round(w*5);
+    adj[a].push([b,cost]);adj[b].push([a,cost]);
+  }return adj;
+}
+function nearest(ll){let b=0,bd=1e18;for(let i=0;i<G.nodes.length/2;i++){const d=(G.nodes[i*2]-ll.lat)**2+(G.nodes[i*2+1]-ll.lng)**2;if(d<bd){bd=d;b=i;}}return b;}
+function dijkstra(s,t){
+  const N=G.nodes.length/2,adj=buildAdj(),dist=new Float64Array(N).fill(1e18),prev=new Int32Array(N).fill(-1);
+  dist[s]=0;const pq=[[0,s]];
+  while(pq.length){pq.sort((a,b)=>a[0]-b[0]);const[u]=pq.shift();if(u===t)break;for(const[v,c]of adj[u]){const nd=dist[u]+c;if(nd<dist[v]){dist[v]=nd;prev[v]=u;pq.push([nd,v]);}}}
+  if(!isFinite(dist[t]))return null;
+  const path=[];let c=t;while(c!==-1){path.unshift(c);c=prev[c];}return{path,dist:dist[t]};
+}
+function edgeNameOf(a,b){
+  for(let i=0;i<G.edgesA.length;i++){const x=G.edgesA[i],y=G.edgesB[i];if((x===a&&y===b)||(x===b&&y===a))return G.edgesNameIdx[i]>=0?G.names[G.edgesNameIdx[i]]:"(unnamed)";}
+  return "(?)";
+}
+function drawNetwork(){
+  if(network){map.removeLayer(network);}
+  network=L.layerGroup().addTo(map);
+  const segs={road:[],shared:[],green:[],light:[],village:[],forb:[]};
+  for(let i=0;i<G.edgesA.length;i++){
+    const a=G.edgesA[i],b=G.edgesB[i],la=G.nodes[a*2],lo=G.nodes[a*2+1],lb=G.nodes[b*2],lj=G.nodes[b*2+1];
+    const nil=G.edgesNameIdx[i],nm=nil>=0?G.names[nil].toLowerCase():"";
+    let k;
+    if(nil<0)k="light";
+    else if(nm===VILLAGE)k="village";
+    else if(SHARED.has(nm))k="shared";
+    else if(G.edgesPath[i]===0)k="road";
+    else k="green";
+    segs[k].push([[lo,la],[lj,lb]]);
+  }
+  const colors={road:"#b4b0a6",shared:"#43618c",green:"#1f9d55",light:"#8fc7a3",village:"#1e88e5",forb:"#d35f4e"};
+  const widths={road:2,shared:3,green:3,light:1.5,village:4,forb:2};
+  for(const k of Object.keys(colors)){segs[k].forEach(([p,q])=>L.polyline([p,q],{color:colors[k],weight:widths[k],opacity:.9}).addTo(network));}
+  (G.forbidden||[]).forEach(ch=>{const pts=ch.map(p=>[p[1],p[0]]);L.polyline(pts,{color:"#d35f4e",weight:2,opacity:.7,dashArray:"4 4"}).addTo(network);});
+}
+function ensureNetwork(){drawNetwork();}
+function drawRoute(path){
+  if(routeLayer)map.removeLayer(routeLayer);
+  if(markA)map.removeLayer(markA);if(markB)map.removeLayer(markB);
+  if(!path)return;
+  const ll=path.map(i=>[G.nodes[i*2+1],G.nodes[i*2]]);
+  routeLayer=L.layerGroup().addTo(map);
+  L.polyline(ll,{color:"#fff",weight:7,opacity:.9}).addTo(routeLayer);
+  L.polyline(ll,{color:"#1e88e5",weight:5,opacity:.98}).addTo(routeLayer);
+  const aI=path[0],bI=path[path.length-1];
+  markA=L.circleMarker([G.nodes[aI*2+1],G.nodes[aI*2]],{radius:8,color:"#fff",fillColor:"#2fae9a",fillOpacity:1}).addTo(routeLayer);
+  markB=L.circleMarker([G.nodes[bI*2+1],G.nodes[bI*2]],{radius:8,color:"#fff",fillColor:"#d35f4e",fillOpacity:1}).addTo(routeLayer);
+  // cumulative meters from edge weights
+  let meters=0;
+  for(let i=1;i<path.length;i++){const a=path[i-1],b=path[i];for(let k=0;k<G.edgesA.length;k++){const x=G.edgesA[k],y=G.edgesB[k];if((x===a&&y===b)||(x===b&&y===a)){meters+=G.edgesW[k];break;}}}
+  // directions
+  let prev="",dirs=[];
+  for(let i=1;i<path.length;i++){const nm=edgeNameOf(path[i-1],path[i]);if(nm!==prev){prev=nm;dirs.push(nm);}}
+  msg.textContent="ROUTE ("+Math.round(meters)+" m, "+path.length+" hops)\n"+dirs.join("  >>  ");
+}
+let lastStart=null;
+map.on("click",e=>{
+  if(mode==="test"){
+    if(!lastStart){lastStart=[e.latlng.lat,e.latlng.lng];stat.textContent="start set — choose destination";return;}
+    const s=nearest({lat:lastStart[0],lng:lastStart[1]}),t=nearest(e.latlng);
+    const r=dijkstra(s,t);
+    if(!r){msg.textContent="No legal-path route between those points (a gap).";drawRoute(null);}
+    else drawRoute(r.path);
+    lastStart=null;
+  }else{
+    if(selNode===null){// grab nearest node to click
+      selNode=nearest(e.latlng);
+      const d=hav([G.nodes[selNode*2],G.nodes[selNode*2+1]],[e.latlng.lat,e.latlng.lng]);
+      if(d>60){msg.textContent="no node within 60 m — move the click closer to a line node.";selNode=null;return;}
+      stat.textContent="node "+selNode+" grabbed — click where it should be.";
+      return;
+    }
+    // move node to click
+    G.nodes[selNode*2]=e.latlng.lat;G.nodes[selNode*2+1]=e.latlng.lng;
+    fixes[selNode]=[e.latlng.lat,e.latlng.lng];
+    selNode=null;
+    stat.textContent="moved node @"+Object.keys(fixes).length+" point(s). Export when done.";
+    exportBtn.disabled=false;
+    drawNetwork();
+    if(routeLayer)map.removeLayer(routeLayer);
+  }
+});
+fixBtn.onclick=()=>{mode="fix";fixBtn.classList.add("on");testBtn.classList.remove("on");selNode=null;msg.textContent="Fix mode: click a point on a line, then click where it belongs (within ~60 m).";};
+testBtn.onclick=()=>{mode="test";testBtn.classList.add("on");fixBtn.classList.remove("on");lastStart=null;msg.textContent="Test mode: click start, then destination.";};
+exportBtn.onclick=()=>{
+  const blob=new Blob([JSON.stringify(G)],{type:"application/json"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="graph.json";
+  a.click();exportBtn.disabled=true;stat.textContent="exported — bring this file back to bake corrections into the app.";
+};
+fetch(GRAPH_URL).then(r=>{if(!r.ok)throw new Error("HTTP "+r.status);return r.json();})
+  .then(g=>{G=g;const b=g.bbox||null;ensureNetwork();
+    if(b){map.fitBounds([[b[1],b[0]],[b[3],b[2]]]);}
+    stat.textContent="graph loaded: "+(g.nodes.length/2)+" nodes · "+g.edgesA.length+" edges · "+g.names.length+" names";
+  }).catch(e=>{stat.textContent="ERROR loading graph: "+e.message;msg.textContent="Graph failed to load — check the path to ../app/public/data/graph.json";});
+</script>
+</body>
+</html>
