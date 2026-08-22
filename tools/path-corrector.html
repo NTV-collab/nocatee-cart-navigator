@@ -3,197 +3,208 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Nocatee Path Corrector</title>
+<title>Nocatee Cart Network</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
   html,body{margin:0;height:100%;font-family:system-ui,sans-serif;background:#111;color:#e6e6e6}
-  #map{position:fixed;inset:0}
-  #panel{position:fixed;top:10px;left:10px;z-index:1000;width:300px;max-height:86vh;overflow:auto;
-    background:rgba(20,20,20,.92);border:1px solid #333;border-radius:10px;padding:12px}
-  h1{font-size:15px;margin:0 0 8px;color:#2fae9a}
+  #map{position:fixed;inset:0;background:#e5e0d5}
+  #panel{position:fixed;top:10px;left:10px;z-index:1000;width:300px;max-height:88vh;overflow:auto;
+    background:rgba(20,20,20,.93);border:1px solid #333;border-radius:10px;padding:12px}
+  h1{font-size:15px;margin:0 0 8px;color:#4caf50}
   .mode{display:flex;gap:6px;margin:8px 0}
   .mode button{flex:1;background:#222;color:#ccc;border:1px solid #444;border-radius:6px;padding:6px;cursor:pointer}
-  .mode button.on{background:#2fae9a;border-color:#2fae9a;color:#062}
+  .mode button.on{background:#2e7d32;border-color:#2e7d32;color:#eaff}
   button{padding:6px 10px;border-radius:6px;border:none;cursor:pointer;font-size:13px}
   #export{background:#2fae9a;color:#062;font-weight:600;width:100%;margin-top:8px}
   #export:disabled{background:#333;color:#777;cursor:not-allowed}
-  .out{font-size:12px;color:#bbb;white-space:pre-wrap;margin-top:8px;max-height:40vh;overflow:auto}
-  .stat{font-size:11px;color:#888;margin-top:6px}
-  .legend{font-size:10px;color:#aaa;margin-top:8px;line-height:1.5}
-  .pill{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+  .out{font-size:12px;color:#ddd;white-space:pre-wrap;margin-top:8px;max-height:30vh;overflow:auto}
+  .stat{font-size:11px;color:#999;margin-top:6px}
+  label.tgl{display:flex;align-items:center;gap:6px;font-size:12px;margin-top:8px;color:#ccc;cursor:pointer}
+  .legend{font-size:11px;color:#ccc;margin-top:10px;line-height:1.6}
+  .pill{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:5px;vertical-align:-1px}
 </style>
 </head>
 <body>
 <div id="map"></div>
 <div id="panel">
-  <h1>⛳ Nocatee Cart Path Corrector</h1>
+  <h1>🛺 Nocatee Cart Network</h1>
   <div class="mode">
     <button id="mTest" class="on">Test route</button>
     <button id="mFix">Fix points</button>
   </div>
-  <div id="hint" class="out">Test mode: click a start, then a destination → run Dijkstra (legal-paths only).</div>
+  <label class="tgl"><input type="checkbox" id="showOthers"> show non-cart roads (gray backdrop)</label>
+  <div id="hint" class="out">Test mode: click a start, then a destination. Routes use ONLY green trails + dark-green EV roadways.</div>
   <button id="export" disabled>Export corrected graph.json</button>
-  <div class="stat" id="stat">loading graph…</div>
+  <div class="stat" id="stat">loading…</div>
   <div class="legend">
-    <span class="pill" style="background:#1f9d55"></span>trail (cart)
-    <span class="pill" style="background:#2e7d32"></span>EV-approved roadway
-    <span class="pill" style="background:#d8d8d8"></span>not in cart network<br/>
-    Routes use <b>only</b> green trails + dark-green EV roadways.
+    <span class="pill" style="background:#1f9d55"></span>trail
+    <span class="pill" style="background:#2e7d32"></span>EV-approved roadway<br/>
+    Each <b>color group</b> below is one connected component — gaps show as separate hues.
   </div>
 </div>
 <script>
 const GRAPH_URL = new URL("../app/public/data/graph.json", location.href).href;
 const SHARED = new Set(["marketside avenue","capital green drive","settlement drive","nocatee village drive","majestic eagle drive","myrtle brook bend","stately shoals trail","willow bay drive"]);
-const VILLAGE = "nocatee village drive";
 const FORBIDDEN = new Set(["preservation trail"]);
+let G=null, compOf=null, nComp=0;
 
-let G=null;
 const map = L.map("map",{zoomSnap:.5}).setView([30.10,-81.42],13);
-L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",{attribution:"&copy; OpenStreetMap &copy; CARTO"}).addTo(map);
+L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",{attribution:"&copy; OpenStreetMap &copy; CARTO",maxZoom:20}).addTo(map);
 
-let network=null, routeLayer=null, markA=null, markB=null;
-let mode="test", selNode=null, fixes={}, snapPreview=null;
+let network=null, routeLayer=null, pickA=null, pickB=null, markA=null, markB=null, snapPreview=null;
+let mode="test", selNode=null, fixes={}, lastStart=null;
 const msg=document.getElementById("hint"), stat=document.getElementById("stat");
 const fixBtn=document.getElementById("mFix"), testBtn=document.getElementById("mTest");
-const exportBtn=document.getElementById("export");
+const exportBtn=document.getElementById("export"), showOthersCb=document.getElementById("showOthers");
 
 function hav(a,b){const R=6371000,p1=a[0]*Math.PI/180,p2=b[0]*Math.PI/180,dp=(b[0]-a[0])*Math.PI/180,dl=(b[1]-a[1])*Math.PI/180;
   const x=Math.sin(dp/2)**2+Math.cos(p1)*Math.cos(p2)*Math.sin(dl/2)**2;return 2*R*Math.asin(Math.sqrt(x));}
-// Snap a click to the nearest point ON any graph line (trail/street/shared),
-// so a moved node lands on the network instead of in open space.
-function snapPointToNetwork(lat,lng){
-  const cos=Math.max(1e-9,Math.cos(lat*Math.PI/180));
-  let best={lat:lat,lng:lng,d:1e18};
-  for(let i=0;i<G.edgesA.length;i++){
-    const a=G.edgesA[i],b=G.edgesB[i];
-    const ax=G.nodes[a*2+1]*cos, ay=G.nodes[a*2];
-    const bx=G.nodes[b*2+1]*cos, by=G.nodes[b*2];
-    const abx=bx-ax, aby=by-ay;
-    const len2=abx*abx+aby*aby;
-    let t=0;if(len2>1e-12){t=((lng*cos-ax)*abx+(lat-ay)*aby)/len2;t=t<0?0:t>1?1:t;}
-    const dx=lng*cos-(ax+abx*t), dy=lat-(ay+aby*t);
-    const d=dx*dx+dy*dy;
-    if(d<best.d)best={lat:ay+aby*t,lng:(ax+abx*t)/cos,d};
-  }
-  return best;
-}
 
 function isCartLegal(i){
-  // Cart-driving network = trails (edgesPath=1) + EV-approved roadways (SHARED). Everything else ignored.
   const ni=G.edgesNameIdx[i];
   if(ni>=0&&FORBIDDEN.has(G.names[ni].toLowerCase()))return false;
-  if(G.edgesPath[i]===1)return true;                 // green trail
-  if(ni>=0&&SHARED.has(G.names[ni].toLowerCase()))return true; // dark-green EV roadway
+  if(G.edgesPath[i]===1)return true;
+  if(ni>=0&&SHARED.has(G.names[ni].toLowerCase()))return true;
   return false;
 }
-function buildAdj(){
-  const N=G.nodes.length/2,adj=Array.from({length:N},()=>[]);
-  for(let i=0;i<G.edgesA.length;i++){
-    if(!isCartLegal(i))continue;
-    const a=G.edgesA[i],b=G.edgesB[i],w=G.edgesW[i],path=G.edgesPath[i]===1,ni=G.edgesNameIdx[i];
-    const cost=path?w:Math.round(w*1.2);
-    adj[a].push([b,cost]);adj[b].push([a,cost]);
-  }return adj;
+// color a component distinctly (hue spread), so connectivity / gaps are obvious
+const COMP_COLORS=["#1f9d55","#00695c","#2e9e5b","#00796b","#43a047","#00897b","#33691e","#00a970","#1b5e20","#00bfa5"];
+function compColor(c){return COMP_COLORS[c%COMP_COLORS.length];}
+
+function computeComponents(){
+  const N=G.nodes.length/2, adj=Array.from({length:N},()=>[]);
+  for(let i=0;i<G.edgesA.length;i++){ if(!isCartLegal(i))continue; adj[G.edgesA[i]].push(G.edgesB[i]); adj[G.edgesB[i]].push(G.edgesA[i]); }
+  compOf=new Int32Array(N).fill(-1); nComp=0;
+  for(let s=0;s<N;s++){
+    if(compOf[s]!==-1)continue; const st=[s]; compOf[s]=nComp;
+    while(st.length){const u=st.pop();for(const v of adj[u])if(compOf[v]===-1){compOf[v]=nComp;st.push(v);}}
+    nComp++;
+  }
+  // size per component
+  const sz=new Array(nComp).fill(0);for(let i=0;i<N;i++)sz[compOf[i]]++;
+  return {size:sz, cartNode: function(n){return compOf[n]!==-1;} };
 }
-function nearest(ll){let b=0,bd=1e18;for(let i=0;i<G.nodes.length/2;i++){const d=(G.nodes[i*2]-ll.lat)**2+(G.nodes[i*2+1]-ll.lng)**2;if(d<bd){bd=d;b=i;}}return b;}
-function dijkstra(s,t){
-  const N=G.nodes.length/2,adj=buildAdj(),dist=new Float64Array(N).fill(1e18),prev=new Int32Array(N).fill(-1);
-  dist[s]=0;const pq=[[0,s]];
-  while(pq.length){pq.sort((a,b)=>a[0]-b[0]);const[u]=pq.shift();if(u===t)break;for(const[v,c]of adj[u]){const nd=dist[u]+c;if(nd<dist[v]){dist[v]=nd;prev[v]=u;pq.push([nd,v]);}}}
-  if(!isFinite(dist[t]))return null;
-  const path=[];let c=t;while(c!==-1){path.unshift(c);c=prev[c];}return{path,dist:dist[t]};
-}
-function edgeNameOf(a,b){
-  for(let i=0;i<G.edgesA.length;i++){const x=G.edgesA[i],y=G.edgesB[i];if((x===a&&y===b)||(x===b&&y===a))return G.edgesNameIdx[i]>=0?G.names[G.edgesNameIdx[i]]:"(unnamed)";}
-  return "(?)";
-}
+
 function drawNetwork(){
   if(network){map.removeLayer(network);}
   network=L.layerGroup().addTo(map);
-  const segs={trail:[],ev:[],other:[]};
+  const showOthers=showOthersCb.checked;
+  const segs={};
+  const orders=[];
   for(let i=0;i<G.edgesA.length;i++){
     const a=G.edgesA[i],b=G.edgesB[i];
     const p=[[G.nodes[a*2+1],G.nodes[a*2]],[G.nodes[b*2+1],G.nodes[b*2]]];
-    if(isCartLegal(i)) segs[G.edgesPath[i]===1?"trail":"ev"].push(p);
-    else segs.other.push(p);
+    if(isCartLegal(i)){
+      const c=compOf[a]; const key="comp"+c;
+      (segs[key]=segs[key]||{edges:[],color:compColor(c)}).edges.push(p);
+      if(!orders.includes(key))orders.push(key);
+    } else if(showOthers){
+      (segs.other=segs.other||{edges:[],color:"#d8d8d8"}).edges.push(p);
+      if(!orders.includes("other"))orders.push("other");
+    }
   }
-  // cart-driving network only: green trails + dark-green EV roadways
-  segs.trail.forEach(p=>L.polyline(p,{color:"#1f9d55",weight:3,opacity:.95}).addTo(network));
-  segs.ev.forEach(p=>L.polyline(p,{color:"#2e7d32",weight:4,opacity:.95}).addTo(network));
-  // everything else is NOT part of the cart network — draw faint so the coverage gap reads clearly
-  segs.other.forEach(p=>L.polyline(p,{color:"#d8d8d8",weight:1.5,opacity:.5}).addTo(network));
+  orders.forEach(k=>{const g=segs[k];const w=g.color==="#d8d8d8"?1.5:3;
+    // cart edges slightly thicker, clear
+    g.edges.forEach(p=>L.polyline(p,{color:g.color,weight:w,opacity:g.color==="#d8d8d8"?.35:.95}).addTo(network));});
 }
-function ensureNetwork(){drawNetwork();}
-function drawRoute(path){
-  if(routeLayer)map.removeLayer(routeLayer);
-  if(markA)map.removeLayer(markA);if(markB)map.removeLayer(markB);
+function ensureNetwork(){computeComponents();drawNetwork();}
+
+function cartNearest(lat,lng){
+  // nearest node that belongs to the cart network (any component)
+  let b=-1,bd=hav([lat,lng],[G.nodes[0],G.nodes[1]]);
+  for(let i=0;i<G.nodes.length/2;i++){const d=hav([lat,lng],[G.nodes[i*2],G.nodes[i*2+1]]);if(d<bd&&compOf[i]!==-1){bd=d;b=i;}}
+  return {idx:b,d:bd};
+}
+function dijkstraCart(s,t,adj){
+  const N=compOf.length,dist=new Float64Array(N).fill(1e18),prev=new Int32Array(N).fill(-1);
+  dist[s]=0;const pq=[[0,s]];
+  while(pq.length){pq.sort((a,b)=>a[0]-b[0]);const u=pq.shift()[0];if(u===t)break;
+    for(const[v,w]of adj[u]){const nd=dist[u]+w;if(nd<dist[v]){dist[v]=nd;prev[v]=u;pq.push([nd,v]);}}
+  }
+  if(dist[t]>=1e17)return null;
+  const path=[];let c=t;while(c!==-1){path.unshift(c);c=prev[c];}return {path,dist:dist[t]};
+}
+function buildCartAdj(){
+  const N=G.nodes.length/2,adj=Array.from({length:N},()=>[]);
+  for(let i=0;i<G.edgesA.length;i++){if(!isCartLegal(i))continue;
+    const a=G.edgesA[i],b=G.edgesB[i],w=G.edgesW[i],cost=G.edgesPath[i]===1?w:Math.round(w*1.2);
+    adj[a].push([b,cost]);adj[b].push([a,cost]);}
+  return adj;
+}
+
+function clearRoute(){if(routeLayer)map.removeLayer(routeLayer);routeLayer=null;if(markA)map.removeLayer(markA);if(markB)map.removeLayer(markB);markA=markB=null;if(pickA)map.removeLayer(pickA);if(pickB)map.removeLayer(pickB);pickA=pickB=null;}
+function showRoute(path){
+  clearRoute();
   if(!path)return;
   const ll=path.map(i=>[G.nodes[i*2+1],G.nodes[i*2]]);
   routeLayer=L.layerGroup().addTo(map);
   L.polyline(ll,{color:"#fff",weight:7,opacity:.9}).addTo(routeLayer);
-  L.polyline(ll,{color:"#1e88e5",weight:5,opacity:.98}).addTo(routeLayer);
+  L.polyline(ll,{color:"#d84315",weight:5,opacity:.98}).addTo(routeLayer);
   const aI=path[0],bI=path[path.length-1];
   markA=L.circleMarker([G.nodes[aI*2+1],G.nodes[aI*2]],{radius:8,color:"#fff",fillColor:"#2fae9a",fillOpacity:1}).addTo(routeLayer);
   markB=L.circleMarker([G.nodes[bI*2+1],G.nodes[bI*2]],{radius:8,color:"#fff",fillColor:"#d35f4e",fillOpacity:1}).addTo(routeLayer);
-  // cumulative meters from edge weights
-  let meters=0;
-  for(let i=1;i<path.length;i++){const a=path[i-1],b=path[i];for(let k=0;k<G.edgesA.length;k++){const x=G.edgesA[k],y=G.edgesB[k];if((x===a&&y===b)||(x===b&&y===a)){meters+=G.edgesW[k];break;}}}
-  // directions
-  let prev="",dirs=[];
-  for(let i=1;i<path.length;i++){const nm=edgeNameOf(path[i-1],path[i]);if(nm!==prev){prev=nm;dirs.push(nm);}}
-  msg.textContent="ROUTE ("+Math.round(meters)+" m, "+path.length+" hops)\n"+dirs.join("  >>  ");
+  let meters=0,prev="",dirs=[];
+  for(let i=1;i<path.length;i++){const a=path[i-1],b=path[i];let nm=edgeNameOf(a,b);if(nm!==prev){prev=nm;dirs.push(nm);}
+    for(let k=0;k<G.edgesA.length;k++){const x=G.edgesA[k],y=G.edgesB[k];if((x===a&&y===b)||(x===b&&y===a)){meters+=G.edgesW[k];break;}}}
+  msg.textContent="ROUTE · "+Math.round(meters)+" m · "+path.length+" hops\n"+dirs.join("  >>  ");
 }
-let lastStart=null;
+function edgeNameOf(a,b){for(let i=0;i<G.edgesA.length;i++){const x=G.edgesA[i],y=G.edgesB[i];if((x===a&&y===b)||(x===b&&y===a))return G.edgesNameIdx[i]>=0?G.names[G.edgesNameIdx[i]]:"(unnamed)";}return "(?)";}
+
+function pickMarker(ll,color){return L.circleMarker(ll,{radius:7,color:"#fff",weight:2,fillColor:color,fillOpacity:1}).addTo(map);}
+
 map.on("click",e=>{
   if(mode==="test"){
-    if(!lastStart){lastStart=[e.latlng.lat,e.latlng.lng];stat.textContent="start set — choose destination";return;}
-    const s=nearest({lat:lastStart[0],lng:lastStart[1]}),t=nearest(e.latlng);
-    const r=dijkstra(s,t);
-    if(!r){msg.textContent="No legal-path route between those points (a gap).";drawRoute(null);}
-    else drawRoute(r.path);
+    if(!lastStart){lastStart=e.latlng; if(pickA)map.removeLayer(pickA); pickA=pickMarker([e.latlng.lat,e.latlng.lng],"#2fae9a"); stat.textContent="start set — choose destination"; return;}
+    if(pickB)map.removeLayer(pickB); pickB=pickMarker([e.latlng.lat,e.latlng.lng],"#d35f4e");
+    const A=cartNearest(lastStart.lat,lastStart.lng), B=cartNearest(e.latlng.lat,e.latlng.lng);
+    if(A.idx<0||B.idx<0){msg.textContent="No cart-network nearby — you're in a gap.";clearRoute();lastStart=null;return;}
+    if(compOf[A.idx]!==compOf[B.idx]){
+      msg.textContent="These are in DIFFERENT components (#"+(nComp?1:0)+"of "+nComp+" network clusters) — no cart route connects them; the network has a gap here.";
+      showRoute(null);lastStart=null;return;
+    }
+    const adj=buildCartAdj();const r=dijkstraCart(A.idx,B.idx,adj);
+    if(!r){msg.textContent="No cart route within the component — gap.";showRoute(null);}
+    else showRoute(r.path);
     lastStart=null;
   }else{
-    if(selNode===null){// grab nearest node to click
-      selNode=nearest(e.latlng);
-      const d=hav([G.nodes[selNode*2],G.nodes[selNode*2+1]],[e.latlng.lat,e.latlng.lng]);
-      if(d>60){msg.textContent="no node within 60 m — move the click closer to a line node.";selNode=null;return;}
-      stat.textContent="node "+selNode+" grabbed — click where it should be.";
-      return;
-    }
-    // move node, snapping to the nearest graph line
+    if(selNode===null){const g=cartNearest(e.latlng.lat,e.latlng.lng);
+      if(g.idx<0||g.d>60){msg.textContent="no cart-network point within 60 m here.";return;}
+      selNode=g.idx;stat.textContent="node "+selNode+" (component #"+compOf[selNode]+") — click where it should move.";return;}
     const s=snapPointToNetwork(e.latlng.lat,e.latlng.lng);
-    G.nodes[selNode*2]=s.lat;G.nodes[selNode*2+1]=s.lng;
-    fixes[selNode]=[s.lat,s.lng];
-    selNode=null;
+    G.nodes[selNode*2]=s.lat;G.nodes[selNode*2+1]=s.lng;fixes[selNode]=[s.lat,s.lng];selNode=null;
     if(snapPreview){map.removeLayer(snapPreview);snapPreview=null;}
-    stat.textContent="moved node @"+Object.keys(fixes).length+" point(s). Export when done.";
-    exportBtn.disabled=false;
-    drawNetwork();
-    if(routeLayer)map.removeLayer(routeLayer);
+    stat.textContent="moved "+Object.keys(fixes).length+" point(s). Export when done.";exportBtn.disabled=false;
+    ensureNetwork();clearRoute();
   }
 });
-// live snap-target preview while dragging a node in Fix mode
-map.on("mousemove",e=>{
-  if(mode!=="fix"||selNode===null)return;
-  const s=snapPointToNetwork(e.latlng.lat,e.latlng.lng);
-  if(!snapPreview){snapPreview=L.circleMarker([s.lat,s.lng],{radius:6,color:"#fff",weight:2,fillColor:"#2fae9a",fillOpacity:.95,interactive:false}).addTo(map);}
-  else snapPreview.setLatLng([s.lat,s.lng]);
-});
+map.on("mousemove",e=>{if(mode!=="fix"||selNode===null)return;const s=snapPointToNetwork(e.latlng.lat,e.latlng.lng);
+  if(!snapPreview){snapPreview=L.circleMarker([s.lat,s.lng],{radius:6,color:"#fff",fillColor:"#2fae9a",fillOpacity:.95,interactive:false}).addTo(map);}else snapPreview.setLatLng([s.lat,s.lng]);});
 const clearPreview=()=>{if(snapPreview){map.removeLayer(snapPreview);snapPreview=null;}};
-fixBtn.onclick=()=>{mode="fix";fixBtn.classList.add("on");testBtn.classList.remove("on");selNode=null;clearPreview();msg.textContent="Fix mode: click a node, then click where it should land — it snaps to the nearest trail/street.";};
-testBtn.onclick=()=>{mode="test";testBtn.classList.add("on");fixBtn.classList.remove("on");lastStart=null;clearPreview();msg.textContent="Test mode: click start, then destination.";};
-exportBtn.onclick=()=>{
-  const blob=new Blob([JSON.stringify(G)],{type:"application/json"});
-  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="graph.json";
-  a.click();exportBtn.disabled=true;stat.textContent="exported — bring this file back to bake corrections into the app.";
-};
+fixBtn.onclick=()=>{mode="fix";fixBtn.classList.add("on");testBtn.classList.remove("on");selNode=null;clearPreview();clearRoute();msg.textContent="Fix mode: click a cart point, then click where it should land (snaps to nearest line).";};
+testBtn.onclick=()=>{mode="test";testBtn.classList.add("on");fixBtn.classList.remove("on");lastStart=null;clearPreview();clearRoute();msg.textContent="Test mode: click start, then destination.";};
+showOthersCb.onchange=()=>{if(G)drawNetwork();};
+exportBtn.onclick=()=>{const blob=new Blob([JSON.stringify(G)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="graph.json";a.click();exportBtn.disabled=true;stat.textContent="exported — bring this file back to bake corrections in.";};
+
+// snap clicked move onto nearest graph line
+function snapPointToNetwork(lat,lng){
+  const cos=Math.max(1e-9,Math.cos(lat*Math.PI/180));let best={lat,lng,d:1e18};
+  for(let i=0;i<G.edgesA.length;i++){const a=G.edgesA[i],b=G.edgesB[i];
+    const ax=G.nodes[a*2+1]*cos,ay=G.nodes[a*2],bx=G.nodes[b*2+1]*cos,by=G.nodes[b*2];
+    const abx=bx-ax,aby=by-ay,len2=abx*abx+aby*aby;let t=0;if(len2>1e-12){t=((lng*cos-ax)*abx+(lat-ay)*aby)/len2;t=t<0?0:t>1?1:t;}
+    const dx=lng*cos-(ax+abx*t),dy=lat-(ay+aby*t),d=dx*dx+dy*dy;if(d<best.d)best={lat:ay+aby*t,lng:(ax+abx*t)/cos,d};}
+  return best;
+}
+
 fetch(GRAPH_URL).then(r=>{if(!r.ok)throw new Error("HTTP "+r.status);return r.json();})
-  .then(g=>{G=g;const b=g.bbox||null;ensureNetwork();
-    if(b){map.fitBounds([[b[0],b[1]],[b[2],b[3]]],{padding:[20,20]});}
-    let cartEdges=0;for(let i=0;i<g.edgesA.length;i++)if(isCartLegal(i))cartEdges++;
-    stat.textContent="cart network: "+cartEdges+" legal edges · "+(g.edgesA.length-cartEdges)+" not-in-network";
-  }).catch(e=>{stat.textContent="ERROR loading graph: "+e.message;msg.textContent="Graph failed to load — check the path to ../app/public/data/graph.json";});
+  .then(g=>{G=g;ensureNetwork();
+    const s=computeComponents();const sz=s.size;const big=Math.max(...sz);const biggest=sz.indexOf(big);
+    // count how many comps have >1 node
+    const multi=sz.filter(n=>n>1).length;
+    const b=g.bbox||null;if(b)map.fitBounds([[b[0],b[1]],[b[2],b[3]]],{padding:[24,24]});
+    stat.textContent="cart network: "+sz.filter(n=>n>1).length+" connected clusters · biggest cluster "+big+" nodes · "+sz.length+" total nodes touched";
+    msg.textContent="The map shows the cart network by connected cluster (color = one cluster). Gaps are where colors don't link.";
+  }).catch(e=>{stat.textContent="ERROR: "+e.message;msg.textContent="Graph failed to load.";});
 </script>
 </body>
 </html>
