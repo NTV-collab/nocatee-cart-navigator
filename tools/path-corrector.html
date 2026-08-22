@@ -104,7 +104,7 @@ function drawNetwork(){
   const segs={}; const orders=[];
   for(let i=0;i<G.edgesA.length;i++){
     const a=G.edgesA[i],b=G.edgesB[i];
-    const p=[[G.nodes[a*2+1],G.nodes[a*2]],[G.nodes[b*2+1],G.nodes[b*2]]];
+    const p=[[G.nodes[a*2],G.nodes[a*2+1]],[G.nodes[b*2],G.nodes[b*2+1]]];
     if(isCartLegal(i)){
       const c=compOf[a]; const key="comp"+c;
       (segs[key]=segs[key]||{edges:[],color:compColor(c)}).edges.push(p);
@@ -121,7 +121,7 @@ function drawNetwork(){
     const isRoad=k==="road", isOther=k==="other";
     const w=isOther?1.5:isRoad?2.5:3, op=isOther?.35:isRoad?.8:.95;
     gg.edges.forEach(e=>{
-      const p=isRoad?[[G.nodes[G.edgesA[e.idx]*2+1],G.nodes[G.edgesA[e.idx]*2]],[G.nodes[G.edgesB[e.idx]*2+1],G.nodes[G.edgesB[e.idx]*2]]]:e;
+      const p=isRoad?[[G.nodes[G.edgesA[e.idx]*2],G.nodes[G.edgesA[e.idx]*2+1]],[G.nodes[G.edgesB[e.idx]*2],G.nodes[G.edgesB[e.idx]*2+1]]]:e;
       const pl=L.polyline(p,{color:gg.color,weight:w,opacity:op}).addTo(network);
       if(isRoad)pl.on("click",()=>{ if(!classifyCb.checked)return;
         const nm=roadNameAt(e.idx); if(!nm)return;
@@ -162,13 +162,13 @@ function clearRoute(){if(routeLayer)map.removeLayer(routeLayer);routeLayer=null;
 function showRoute(path){
   clearRoute();
   if(!path)return;
-  const ll=path.map(i=>[G.nodes[i*2+1],G.nodes[i*2]]);
+  const ll=path.map(i=>[G.nodes[i*2],G.nodes[i*2+1]]);
   routeLayer=L.layerGroup().addTo(map);
   L.polyline(ll,{color:"#fff",weight:7,opacity:.9}).addTo(routeLayer);
   L.polyline(ll,{color:"#d84315",weight:5,opacity:.98}).addTo(routeLayer);
   const aI=path[0],bI=path[path.length-1];
-  markA=L.circleMarker([G.nodes[aI*2+1],G.nodes[aI*2]],{radius:8,color:"#fff",fillColor:"#2fae9a",fillOpacity:1}).addTo(routeLayer);
-  markB=L.circleMarker([G.nodes[bI*2+1],G.nodes[bI*2]],{radius:8,color:"#fff",fillColor:"#d35f4e",fillOpacity:1}).addTo(routeLayer);
+  markA=L.circleMarker([G.nodes[aI*2],G.nodes[aI*2+1]],{radius:8,color:"#fff",fillColor:"#2fae9a",fillOpacity:1}).addTo(routeLayer);
+  markB=L.circleMarker([G.nodes[bI*2],G.nodes[bI*2+1]],{radius:8,color:"#fff",fillColor:"#d35f4e",fillOpacity:1}).addTo(routeLayer);
   let meters=0,prev="",dirs=[];
   for(let i=1;i<path.length;i++){const a=path[i-1],b=path[i];let nm=edgeNameOf(a,b);if(nm!==prev){prev=nm;dirs.push(nm);}
     for(let k=0;k<G.edgesA.length;k++){const x=G.edgesA[k],y=G.edgesB[k];if((x===a&&y===b)||(x===b&&y===a)){meters+=G.edgesW[k];break;}}}
