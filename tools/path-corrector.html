@@ -87,6 +87,7 @@ panelEl.addEventListener("click",e=>{ if(panelEl.classList.contains("collapsed")
 function hav(a,b){const R=6371000,p1=a[0]*Math.PI/180,p2=b[0]*Math.PI/180,dp=(b[0]-a[0])*Math.PI/180,dl=(b[1]-a[1])*Math.PI/180;
   const x=Math.sin(dp/2)**2+Math.cos(p1)*Math.cos(p2)*Math.sin(dl/2)**2;return 2*R*Math.asin(Math.sqrt(x));}
 
+function isCartLegalNode(j){ for(let e=0;e<G.edgesA.length;e++){ if((G.edgesA[e]===j||G.edgesB[e]===j)&&isCartLegal(e)) return true;} return false; }
 function isCartLegal(i){
   const ni=G.edgesNameIdx[i];
   if(ni>=0&&FORBIDDEN.has(G.names[ni].toLowerCase()))return false;
@@ -272,17 +273,24 @@ function endDraw(){
     drawPts[0]=[a.lat,a.lng];
     const b=snapPointToNetwork(drawPts[drawPts.length-1][0],drawPts[drawPts.length-1][1]);
     drawPts[drawPts.length-1]=[b.lat,b.lng];
-    // add the connector to the graph as a new path (each consecutive pair an edge)
-    const base=N0=G.nodes.length/2;
-    const nameIdx=-1;
+    // add the connector to the graph as a new path
+    const base=G.nodes.length/2;
     for(let k=0;k<drawPts.length;k++){ G.nodes.push(drawPts[k][0]); G.nodes.push(drawPts[k][1]); }
     const ids=drawPts.map((_,k)=>base+k);
     for(let k=0;k<ids.length-1;k++){
       G.edgesA.push(ids[k]); G.edgesB.push(ids[k+1]);
-      G.edgesW.push(Math.round(hav([drawPts[k][0],drawPts[k][1]],[drawPts[k+1][0],drawPts[k+1][1]])));
+      G.edgesW.push(Math.max(1,Math.round(hav([drawPts[k][0],drawPts[k][1]],[drawPts[k+1][0],drawPts[k+1][1]]))));
       G.edgesPath.push(1); G.edgesNameIdx.push(-1);
       if(G.edgesEV) G.edgesEV.push(1);
     }
+    // bridge the two ends into the nearest EXISTING cart node (<=25m) so it connects
+    const bridge=(id,pt)=>{
+      let best=null,bd=25;
+      for(let j=0;j<base/2;j++){ if(!isCartLegalNode(j))continue; const d=hav(pt,[G.nodes[j*2],G.nodes[j*2+1]]); if(d<bd){bd=d;best=j;} }
+      if(best!==null){ G.edgesA.push(Math.min(id,best)); G.edgesB.push(Math.max(id,best)); G.edgesW.push(Math.max(1,Math.round(bd))); G.edgesPath.push(1); G.edgesNameIdx.push(-1); if(G.edgesEV)G.edgesEV.push(1); }
+    };
+    bridge(ids[0],[drawPts[0][0],drawPts[0][1]]);
+    bridge(ids[ids.length-1],[drawPts[drawPts.length-1][0],drawPts[drawPts.length-1][1]]);
     exportBtn.disabled=false;
     msg.textContent="Drew a new trail ("+ids.length+" points, "+(ids.length-1)+" segments) → exported/on network. Continue or Export.";
     ensureNetwork();
