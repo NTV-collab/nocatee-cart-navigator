@@ -39,6 +39,7 @@
   <div class="mode">
     <button id="mTest" class="on">Test route</button>
     <button id="mFix">Fix points</button>
+    <button id="mDraw">Draw trail</button>
   </div>
   <label class="tgl"><input type="checkbox" id="showOthers" checked> show non-cart roads (gray/blue backdrop)</label>
   <label class="tgl"><input type="checkbox" id="classifyMode"> classify: click a road to (un)EV-approve it → reconnects live</label>
@@ -47,6 +48,10 @@
   <div id="gapActions" style="display:none;gap:6px;margin-top:6px">
     <button id="gapFix" style="background:#2e7d32;color:#fff">Fix (join)</button>
     <button id="gapLegit" style="background:#555;color:#fff">Legit gap</button>
+  </div>
+  <div id="drawActions" style="display:none;gap:6px;margin-top:6px">
+    <button id="drawFinish" style="background:#ff9800;color:#111">Finish trail</button>
+    <button id="drawCancel" style="background:#555;color:#fff">Cancel</button>
   </div>
   <div id="hint" class="out">Test mode: click a start, then a destination. Routes use ONLY green trails + dark-green EV roadways.</div>
   <button id="export" disabled>Export corrected graph.json</button>
@@ -193,6 +198,14 @@ function showRoute(path){
 
 map.on("click",e=>{
   if(classifyCb.checked)return; // road-click toggles are handled on road layers
+  if(mode==="draw"){
+    drawPts.push([e.latlng.lat,e.latlng.lng]);
+    if(drawPoly)map.removeLayer(drawPoly);
+    drawPoly=L.polyline(drawPts,{color:"#ff9800",weight:4,opacity:.95}).addTo(map);
+    document.getElementById("drawActions").style.display="flex";
+    msg.textContent="Drawing… "+drawPts.length+" points — Finish when done.";
+    return;
+  }
   if(mode==="test"){
     if(!lastStart){lastStart=e.latlng; if(pickA)map.removeLayer(pickA); pickA=L.circleMarker([e.latlng.lat,e.latlng.lng],{radius:7,color:"#fff",weight:2,fillColor:"#2fae9a",fillOpacity:1}).addTo(map); stat.textContent="start set — choose destination"; return;}
     if(pickB)map.removeLayer(pickB); pickB=L.circleMarker([e.latlng.lat,e.latlng.lng],{radius:7,color:"#fff",weight:2,fillColor:"#d33f4e",fillOpacity:1}).addTo(map);
@@ -220,8 +233,38 @@ map.on("click",e=>{
 map.on("mousemove",e=>{if(mode!=="fix"||selNode===null)return;const s=snapPointToNetwork(e.latlng.lat,e.latlng.lng);
   if(!snapPreview){snapPreview=L.circleMarker([s.lat,s.lng],{radius:6,color:"#fff",fillColor:"#2fae9a",fillOpacity:.95,interactive:false}).addTo(map);}else snapPreview.setLatLng([s.lat,s.lng]);});
 const clearPreview=()=>{if(snapPreview){map.removeLayer(snapPreview);snapPreview=null;}};
-fixBtn.onclick=()=>{mode="fix";fixBtn.classList.add("on");testBtn.classList.remove("on");selNode=null;clearPreview();clearRoute();msg.textContent="Fix mode: click a cart point, then click where it should land (snaps to nearest line).";};
-testBtn.onclick=()=>{mode="test";testBtn.classList.add("on");fixBtn.classList.remove("on");lastStart=null;clearPreview();clearRoute();msg.textContent="Test mode: click start, then destination.";};
+map.on("dblclick",e=>{ if(mode==="draw"){ e.originalEvent.preventDefault(); endDraw(); } });
+fixBtn.onclick=()=>{mode="fix";fixBtn.classList.add("on");testBtn.classList.remove("on");drawBtn.classList.remove("on");selNode=null;clearPreview();clearRoute();msg.textContent="Fix mode: click a cart point, then click where it should land (snaps to nearest line).";};
+testBtn.onclick=()=>{mode="test";testBtn.classList.add("on");fixBtn.classList.remove("on");drawBtn.classList.remove("on");lastStart=null;clearPreview();clearRoute();msg.textContent="Test mode: click start, then destination.";};
+const drawBtn=document.getElementById("mDraw");
+let drawPts=[], drawPoly=null;
+drawBtn.onclick=()=>{mode="draw";drawBtn.classList.add("on");testBtn.classList.remove("on");fixBtn.classList.remove("on");drawPts=[];clearPreview();clearRoute();msg.textContent="Draw mode: click points to trace a new trail; double-click or tap the last point to finish. Start/end snap to the network.";};
+function endDraw(){
+  if(drawPts.length>=2){
+    // snap first & last onto existing graph line (so it connects)
+    const a=snapPointToNetwork(drawPts[0][0],drawPts[0][1]);
+    drawPts[0]=[a.lat,a.lng];
+    const b=snapPointToNetwork(drawPts[drawPts.length-1][0],drawPts[drawPts.length-1][1]);
+    drawPts[drawPts.length-1]=[b.lat,b.lng];
+    // add the connector to the graph as a new path (each consecutive pair an edge)
+    const base=N0=G.nodes.length/2;
+    const nameIdx=-1;
+    for(let k=0;k<drawPts.length;k++){ G.nodes.push(drawPts[k][0]); G.nodes.push(drawPts[k][1]); }
+    const ids=drawPts.map((_,k)=>base+k);
+    for(let k=0;k<ids.length-1;k++){
+      G.edgesA.push(ids[k]); G.edgesB.push(ids[k+1]);
+      G.edgesW.push(Math.round(hav([drawPts[k][0],drawPts[k][1]],[drawPts[k+1][0],drawPts[k+1][1]])));
+      G.edgesPath.push(1); G.edgesNameIdx.push(-1);
+      if(G.edgesEV) G.edgesEV.push(1);
+    }
+    exportBtn.disabled=false;
+    msg.textContent="Drew a new trail ("+ids.length+" points, "+(ids.length-1)+" segments) → exported/on network. Continue or Export.";
+    ensureNetwork();
+  } else { msg.textContent="Need at least 2 clicks to draw a trail."; }
+  drawPoly=null; drawPts=[]; document.getElementById("drawActions").style.display="none";
+}
+document.getElementById("drawFinish").addEventListener("click",endDraw);
+document.getElementById("drawCancel").addEventListener("click",()=>{drawPts=[];if(drawPoly){map.removeLayer(drawPoly);drawPoly=null;}document.getElementById("drawActions").style.display="none";msg.textContent="Draw cancelled.";});
 showOthersCb.onchange=()=>{if(G)drawNetwork();};
 classifyCb.onchange=()=>{if(G){ensureNetwork();msg.textContent=classifyCb.checked?"Classify mode ON: click roads (blue-gray) to mark/unmark EV-approved.":"Classify mode off.";}};
 exportBtn.onclick=()=>{
