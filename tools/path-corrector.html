@@ -189,7 +189,7 @@ exportBtn.onclick=()=>{
 };
 fetch(GRAPH_URL).then(r=>{if(!r.ok)throw new Error("HTTP "+r.status);return r.json();})
   .then(g=>{G=g;const b=g.bbox||null;ensureNetwork();
-    if(b){map.fitBounds([[b[1],b[0]],[b[3],b[2]]]);}
+    if(b){map.fitBounds([[b[0],b[1]],[b[2],b[3]]],{padding:[20,20]});}
     stat.textContent="graph loaded: "+(g.nodes.length/2)+" nodes · "+g.edgesA.length+" edges · "+g.names.length+" names";
   }).catch(e=>{stat.textContent="ERROR loading graph: "+e.message;msg.textContent="Graph failed to load — check the path to ../app/public/data/graph.json";});
 </script>
