@@ -35,6 +35,12 @@
   </div>
   <label class="tgl"><input type="checkbox" id="showOthers" checked> show non-cart roads (gray/blue backdrop)</label>
   <label class="tgl"><input type="checkbox" id="classifyMode"> classify: click a road to (un)EV-approve it → reconnects live</label>
+  <div class="mode" style="margin-top:8px"><button id="gapsMode">Gaps: show &amp; fix</button></div>
+  <div id="gapsList" style="display:none;max-height:160px;overflow:auto;font-size:11px;margin-top:6px"></div>
+  <div id="gapActions" style="display:none;gap:6px;margin-top:6px">
+    <button id="gapFix" style="background:#2e7d32;color:#fff">Fix (join)</button>
+    <button id="gapLegit" style="background:#555;color:#fff">Legit gap</button>
+  </div>
   <div id="hint" class="out">Test mode: click a start, then a destination. Routes use ONLY green trails + dark-green EV roadways.</div>
   <button id="export" disabled>Export corrected graph.json</button>
   <div class="stat" id="stat">loading…</div>
@@ -224,6 +230,81 @@ function snapPointToNetwork(lat,lng){
     const dx=lng*cos-(ax+abx*t),dy=lat-(ay+aby*t),d=dx*dx+dy*dy;if(d<best.d)best={lat:ay+aby*t,lng:(ax+abx*t)/cos,d};}
   return best;
 }
+
+// ---- Gaps workflow ----
+let GAPS=[], gapsLoaded=false, gapMode=false, gapLayer=null, currentGap=null;
+const GAP_URL = new URL("gaps.json", location.href).href;
+function hav2(i,j){ const n=G.nodes; const dlat=(n[i*2]-n[j*2])*110574, dlng=(n[i*2+1]-n[j*2+1])*Math.cos((n[i*2]+n[j*2])/2*Math.PI/180)*111320; return Math.hypot(dlat,dlng); }
+function computeGapsOnline(){
+  const N=G.nodes.length/2, n=G.nodes, cart=new Set();
+  for(let e=0;e<G.edgesA.length;e++){ if(isCartLegal(e)){ cart.add(G.edgesA[e]); cart.add(G.edgesB[e]); } }
+  const comp=new Array(N).fill(-1); let nc=0; const adj=[...Array(N)].map(()=>[]);
+  for(let e=0;e<G.edgesA.length;e++){ if(isCartLegal(e)){ const a=G.edgesA[e],b=G.edgesB[e]; adj[a].push(b); adj[b].push(a); } }
+  for(let s=0;s<N;s++){ if(comp[s]!==-1||!cart.has(s))continue; const st=[s]; comp[s]=nc;
+    while(st.length){ const u=st.pop(); for(const v of adj[u]){ if(comp[v]===-1&&cart.has(v)){ comp[v]=nc; st.push(v);} } } nc++; }
+  const arr=[...cart]; const out=[];
+  for(let ii=0;ii<arr.length;ii++){ const i=arr[ii];
+    for(let jj=ii+1;jj<arr.length;jj++){ const j=arr[jj];
+      if(comp[i]===comp[j])continue;
+      const d=hav2(i,j);
+      if(d<=60) out.push({i,j,d:d,ci:comp[i],cj:comp[j],ai:n[i*2],bi:n[i*2+1],aj:n[j*2],bj:n[j*2+1],status:'open'});
+    }
+  }
+  return out;
+}
+async function loadGaps(){
+  try{ const r=await fetch(GAP_URL); GAPS= await r.json(); }
+  catch(e){ console.warn("gaps.json missing, computing online", e); GAPS=computeGaps(); }
+  gapsLoaded=true; renderGapsList(); drawGapMarkers();
+}
+function renderGapsList(){
+  const wrap=document.getElementById('gapsList'); if(!wrap) return;
+  const open=GAPS.filter(g=>g.status==='open');
+  wrap.innerHTML='<b>'+open.length+' open / '+GAPS.length+' total</b>'+
+    open.slice(0,40).map(g=>`<button data-g="${g.i}-${g.j}" style="display:block;width:100%;text-align:left;margin:1px 0;background:#222;color:#ccc;border:1px solid #444;border-radius:4px;padding:2px 4px;font-size:11px">${g.d.toFixed(0)}m @ (${g.ai},${g.bi}) — c${g.ci}↔c${g.cj}</button>`).join('');
+  wrap.querySelectorAll('button').forEach(btn=>btn.addEventListener('click',()=>{const g=GAPS.find(x=>`${x.i}-${x.j}`===btn.dataset.g); if(g)focusGap(g);}));
+}
+function focusGap(g){
+  if(!g)return; currentGap=g;
+  document.getElementById('gapActions').style.display='flex';
+  drawGapMarkers();
+  msg.textContent='GAP '+g.i+'-'+g.j+' ('+g.d.toFixed(0)+'m @ '+g.ai+','+g.bi+'): set to Fix or Legit.';
+}
+function drawGapMarkers(){
+  if(gapLayer){map.removeLayer(gapLayer);} gapLayer=L.layerGroup().addTo(map);
+  GAPS.filter(g=>g.status==='open').forEach(g=>{
+    L.circleMarker([g.ai,g.bi],{radius:5,color:'#fff',weight:1,fillColor:'#e53935',fillOpacity:.9}).addTo(gapLayer);
+    L.circleMarker([g.aj,g.bj],{radius:5,color:'#fff',weight:1,fillColor:'#e53935',fillOpacity:.9}).addTo(gapLayer);
+  });
+  if(currentGap){
+    L.polyline([[currentGap.ai,currentGap.bi],[currentGap.aj,currentGap.bj]],{color:'#e53935',weight:3,dashArray:'4 3'}).addTo(gapLayer);
+    map.fitBounds([[currentGap.ai,currentGap.bi],[currentGap.aj,currentGap.bj]],{padding:[60,60]});
+  }
+}
+function gapAction(action){
+  if(!currentGap)return;
+  const g=currentGap;
+  if(action==='fix'){
+    G.nodes[g.j*2]=G.nodes[g.i*2]; G.nodes[g.j*2+1]=G.nodes[g.i*2+1];
+    const a=Math.min(g.i,g.j), b=Math.max(g.i,g.j);
+    let has=false; for(let e=0;e<G.edgesA.length;e++){ if(G.edgesA[e]===a&&G.edgesB[e]===b){has=true;break;} }
+    if(!has){ G.edgesA.push(a); G.edgesB.push(b); G.edgesW.push(1); G.edgesPath.push(1); G.edgesNameIdx.push(-1); if(G.edgesEV)G.edgesEV.push(1); }
+    g.status='fixed'; msg.textContent='FIXED gap '+a+'-'+b+' (merged).';
+  } else {
+    g.status='legit'; msg.textContent='Marked gap '+g.i+'-'+g.j+' LEGIT (real gap, no route).';
+  }
+  currentGap=null; document.getElementById('gapActions').style.display='none';
+  exportBtn.disabled=false;
+  ensureNetwork(); renderGapsList(); drawGapMarkers();
+}
+document.getElementById('gapFix').addEventListener('click',()=>gapAction('fix'));
+document.getElementById('gapLegit').addEventListener('click',()=>gapAction('legit'));
+document.getElementById('gapsMode').addEventListener('click',function(){ this.classList.toggle('on');
+  gapMode=this.classList.contains('on');
+  const lst=document.getElementById('gapsList'); lst.style.display=gapMode?'block':'none';
+  if(gapMode){ if(!gapsLoaded){loadGaps();} else {renderGapsList(); drawGapMarkers();} }
+  else if(gapLayer){map.removeLayer(gapLayer); gapLayer=null;}
+});
 
 const EV_URL = new URL("../app/public/data/ev_roads.json", location.href).href;
 fetch(EV_URL).then(r=>r.ok?r.json():[]).then(arr=>{arr.forEach(x=>EV_NAMES.add(String(x).toLowerCase()));})
