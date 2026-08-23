@@ -440,7 +440,7 @@ function nearestDistOnRoute(path,lat,lng){
 function showRerouteBadge(txt){ const oldB=document.getElementById('rerouteBadge'); if(oldB)oldB.remove(); const b=document.createElement('div'); b.id='rerouteBadge'; b.style.cssText='position:fixed;top:58px;left:12px;z-index:1100;background:#ba5700;color:#fff;font:700 11px Outfit;padding:6px 12px;border-radius:999px'; b.textContent=txt||'Re-routing…'; document.body.appendChild(b); setTimeout(()=>{const x=document.getElementById('rerouteBadge'); if(x)x.remove();},2000); }
 function nearestOnRoutePath(path,lat,lng){ return nearestDistOnRoute(path,lat,lng).idx; }
 
-let lastFollowTT=null;
+let lastFollowT=null;
 function driveZoom(){ return (window.innerWidth<700)?15.5:16.5; }
 function enterDrive(){
   if(!drivePath){ return; }
@@ -449,7 +449,7 @@ function enterDrive(){
   updateNextTurn(0);
   const s=startPt?[startPt.lat,startPt.lng]:[G.nodes[drivePath[0]*2],G.nodes[drivePath[0]*2+1]];
   map.setView([s[0],s[1]], driveZoom(), {animate:true});
-  lastFollowTT=[s[0],s[1]];
+  lastFollowT=[s[0],s[1]];
   ensureWatch();
 }
 function updateNextTurn(offset){
