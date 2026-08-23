@@ -342,7 +342,7 @@ function buildTurnList(){
       let turn='Continue', arrow='↑';
       if(Math.abs(dg)>=25){ turn = dg<0?'Turn left':'Turn right'; arrow = dg<0?'←':'→'; }
       if(Math.abs(dg)>155){ turn='Make a U-turn'; arrow='⟲'; }
-      turns.push({km:cum, text:nm, turn, arrow});
+      turns.push({km:Math.round(cum), text:nm, turn, arrow});
     }
     if(nm!==prevName){ prevName=nm; segStart=cum; }
   }
