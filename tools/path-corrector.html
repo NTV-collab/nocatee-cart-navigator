@@ -481,9 +481,10 @@ function enterDrive(){
   const rb=document.getElementById('residentBar'); if(rb) rb.style.display='none';
   updateNextTurn(0);
   updateTripInfo();
-  const s=startPt?[startPt.lat,startPt.lng]:[G.nodes[drivePath[0]*2],G.nodes[drivePath[0]*2+1]];
-  map.setView([s[0],s[1]], driveZoom(), {animate:true});
-  lastFollowT=[s[0],s[1]];
+  // show the WHOLE route first (overview) so the path is clearly visible; follow kicks in on GPS movement
+  const bounds=L.latLngBounds(drivePath.map(i=>[G.nodes[i*2],G.nodes[i*2+1]]));
+  map.fitBounds(bounds,{padding:[70,70],maxZoom:16});
+  lastFollowT=null;
   ensureWatch();
 }
 function updateTripInfo(){
