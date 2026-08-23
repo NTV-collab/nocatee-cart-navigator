@@ -492,9 +492,21 @@ function residentFillDest(){
     dl.appendChild(o);
   });
 }
-function geocodeNominatim(q){
-  return fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=us&addressdetails=1&q='+encodeURIComponent(q),{headers:{'Accept':'application/json'}})
-    .then(r=>r.json()).then(arr=>arr[0]||null).catch(()=>null);
+const GOOGLE_MAPS_API_KEY = "YOUR_GOOGLE_MAPS_API_KEY"; // ← paste your key here
+function geocodeGoogle(q){
+  if(!GOOGLE_MAPS_API_KEY || GOOGLE_MAPS_API_KEY.indexOf("YOUR_")===0){
+    msg.textContent='Google Maps API key not set. Open the tool source and paste your key in GOOGLE_MAPS_API_KEY.';
+    return Promise.resolve(null);
+  }
+  const url='https://maps.googleapis.com/maps/api/geocode/json?address='+encodeURIComponent(q)+'&key='+encodeURIComponent(GOOGLE_MAPS_API_KEY);
+  return fetch(url).then(r=>r.json()).then(j=>{
+    if(j.status!=='OK'||!j.results||!j.results[0]){ 
+      if(j.status&&j.status!=='ZERO_RESULTS') msg.textContent='Geocoding error: '+j.status;
+      return null;
+    }
+    const r=j.results[0];
+    return {lat:r.geometry.location.lat, lon:r.geometry.location.lng, display_name:r.formatted_address};
+  }).catch(()=>null);
 }
 let destMarker=null;
 function routeToPoint(dp){
@@ -512,7 +524,7 @@ function residentGo(){
   let d=DESTINATIONS.find(x=>x.name.toLowerCase()===val.toLowerCase()) || DESTINATIONS.find(x=>val.toLowerCase().startsWith(x.name.toLowerCase()));
   if(!d && val){
     msg.textContent='Geocoding "'+val+'"…';
-    geocodeNominatim(val).then(res=>{
+    geocodeGoogle(val).then(res=>{
       if(!res){ msg.textContent='Could not find that address — try another.'; return; }
       const dp={lat:parseFloat(res.lat),lng:parseFloat(res.lon)};
       if(destMarker){map.removeLayer(destMarker);}
