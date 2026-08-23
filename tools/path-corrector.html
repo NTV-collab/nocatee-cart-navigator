@@ -89,17 +89,8 @@
     <div id="destAuto" style="display:none;position:absolute;top:100%;left:0;right:0;margin-top:2px;background:#fff;border:1px solid #dbe3e5;border-radius:10px;box-shadow:0 6px 20px rgba(0,54,74,.18);z-index:1300;max-height:230px;overflow:auto"></div>
   </div>
   <button id="residentGo" style="background:#0099ba;color:#fff;border:0;border-radius:999px;padding:6px 14px;font:700 12px Outfit">GO</button>
-document.getElementById('residentClear').addEventListener('click',residentClearRoute);
-function recenterOnMe(){
-  if(navigator.geolocation){
-    navigator.geolocation.getCurrentPosition(pos=>{
-      startPt={lat:pos.coords.latitude,lng:pos.coords.longitude};
-      document.getElementById('residentStartVal').textContent='Your location';
-      map.setView([startPt.lat,startPt.lng], driveZoom());
-    },()=>setStatus('Location unavailable — check permissions.'),{timeout:6000,maximumAge:20000});
-  } else setStatus('Geolocation not supported.');
-}
-document.getElementById('recenterBtn').addEventListener('click',recenterOnMe);
+  <button id="residentClear" style="background:#fff;color:#ba5700;border:1px solid #ba5700;border-radius:999px;padding:5px 12px;font:600 11px Outfit">Clear route</button>
+  <button id="recenterBtn" style="background:#e6f3f6;border:1px solid #0099ba;color:#00788f;border-radius:999px;padding:5px 12px;font:600 11px Outfit" title="Recenter on my location">◎ Recenter</button>
   <button id="recenterBtn" style="background:#e6f3f6;border:1px solid #0099ba;color:#00788f;border-radius:999px;padding:5px 12px;font:600 11px Outfit" title="Recenter on my location">◎ Recenter</button>
   </div>
   <div id="residentStatusBar" style="font-size:11px;color:#2e5562;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:none"></div>
@@ -843,6 +834,17 @@ function routeResident(start,d){
   }
 }
 document.getElementById('residentGo').addEventListener('click',()=>{ residentGo(); setTimeout(()=>{ if(drivePath&&drivePath.length>1) enterDrive(); }, 400); });
+function recenterOnMe(){
+  if(navigator.geolocation){
+    navigator.geolocation.getCurrentPosition(pos=>{
+      startPt={lat:pos.coords.latitude,lng:pos.coords.longitude};
+      document.getElementById('residentStartVal').textContent='Your location';
+      map.setView([startPt.lat,startPt.lng], driveZoom());
+    },()=>setStatus('Location unavailable — check permissions.'),{timeout:6000,maximumAge:20000});
+  } else setStatus('Geolocation not supported.');
+}
+document.getElementById('recenterBtn').addEventListener('click',recenterOnMe);
+
 function residentClearRoute(){
   clearRoute();
   if(driveMode) exitDrive();
