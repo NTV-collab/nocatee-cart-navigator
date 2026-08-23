@@ -897,7 +897,7 @@ var LOGOS=[
   {name:'spray waterpark', url:'https://d2ol7oe51mr4n9.cloudfront.net/user_3GMMpPAbADd1bMVZfaXlzG5p6dM/dd8c7aa0-2581-4746-a637-f9a83168843b.png', w:56, anchor:[28,52]},
   {name:'blue water', url:'https://d2ol7oe51mr4n9.cloudfront.net/user_3GMMpPAbADd1bMVZfaXlzG5p6dM/36a7aa76-8036-4173-8267-c508382c2986.png', w:72, anchor:[36,34], place:{lat:30.100403,lng:-81.416122}},
 ];
-let logoSegMarkers=[];
+window.__logoSegMarkers=[];
 var LOGO_MIN_ZOOM=15;
 function updateLogoZoom(){
   if(document.getElementById('residentBar').style.display!=='flex'){ removeLogos(); return; }
@@ -914,11 +914,11 @@ function addLogos(){
     const m=L.marker([p.lat,p.lng],{icon:ic,interactive:false,zIndexOffset:600}).addTo(map);
     // iOS-safe fade: animationend unreliable; force via JS
     const el=ic; // divIcon; the img
-    logoSegMarkers.push(m);
+    window.__logoSegMarkers.push(m);
     setTimeout(()=>{ const img=m._icon&&m._icon.querySelector('img'); if(img){ img.style.opacity='0'; void img.offsetWidth; img.style.transition='opacity .5s ease'; img.style.opacity='1'; } },30);
   });
 }
-function removeLogoSeg(){ logoSegMarkers.forEach(m=>map.removeLayer(m)); logoSegMarkers=[]; }
+function removeLogoSeg(){ (window.__logoSegMarkers||[]).forEach(m=>map.removeLayer(m)); window.__logoSegMarkers=[]; }
 function removeLogos(){ removeLogoSeg(); }
 function enterResident(){
   document.getElementById('panel').style.display='none';
