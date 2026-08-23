@@ -79,6 +79,7 @@
     <div id="destAuto" style="display:none;position:absolute;top:100%;left:0;right:0;margin-top:2px;background:#fff;border:1px solid #dbe3e5;border-radius:10px;box-shadow:0 6px 20px rgba(0,54,74,.18);z-index:1300;max-height:230px;overflow:auto"></div>
   </div>
   <button id="residentGo" style="background:#0099ba;color:#fff;border:0;border-radius:999px;padding:6px 14px;font:700 12px Outfit">GO</button>
+  <div id="residentStatusBar" style="font-size:11px;color:#2e5562;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:none"></div>
 </div>
 <div id="panel">
   <h1>🛺 Network editor <button id="btnHide" title="collapse">–</button></h1>
@@ -259,7 +260,9 @@ function showRoute(path){
   let meters=0,prev="",dirs=[];
   for(let i=1;i<path.length;i++){const a=path[i-1],b=path[i];let nm=edgeNameOf(a,b);if(nm!==prev){prev=nm;dirs.push(nm);}
     for(let k=0;k<G.edgesA.length;k++){const x=G.edgesA[k],y=G.edgesB[k];if((x===a&&y===b)||(x===b&&y===a)){meters+=G.edgesW[k];break;}}}
-  msg.textContent="ROUTE · "+Math.round(meters)+" m · "+path.length+" hops\n"+dirs.join("  >>  ");
+  const hdr=document.getElementById('residentBar');
+  const out=(hdr && hdr.style.display!=='none') ? (document.getElementById('residentStatusBar')||msg) : msg;
+  if(out) out.textContent="ROUTE · "+Math.round(meters)+" m · "+path.length+" hops\n"+dirs.join("  >>  ");
 }
 
 let driveMode=false, drivePath=null;
@@ -679,6 +682,7 @@ document.getElementById('residentStartBtn').addEventListener('click',()=>{armFie
 function enterResident(){
   document.getElementById('panel').style.display='none';
   document.getElementById('residentBar').style.display='flex';
+  const sb=document.getElementById('residentStatusBar'); if(sb)sb.style.display='block';
   // hide all dev overlays for a clean user map
   if(requestAnimationFrame||true){ if(network)map.removeLayer(network); if(gapLayer)map.removeLayer(gapLayer); }
   // hide the dev badge
