@@ -83,7 +83,7 @@
   <button id="residentStartBtn" style="background:#e6f3f6;border:1px solid #0099ba;color:#00788f;border-radius:999px;padding:5px 10px;font:600 11px Outfit">Set point</button>
   <div style="width:1px;height:28px;background:#dbe3e5"></div>
   <div style="display:flex;flex-direction:column;font-size:11px;min-width:120px;flex:1;position:relative">
-    <span style="color:#0099ba;font-weight:600">DESTINATION</span>
+    <span style="color:#00788f;font-weight:700;font-size:11px;letter-spacing:.4px">WHERE TO?</span>
     <input id="residentDestInput" list="destPicklist" placeholder="Business or address in Nocatee…" style="border:0;outline:0;background:transparent;color:#00364a;font:700 13px Outfit;width:100%"/>
     <datalist id="destPicklist" style="display:none"></datalist>
     <div id="destAuto" style="display:none;position:absolute;top:100%;left:0;right:0;margin-top:2px;background:#fff;border:1px solid #dbe3e5;border-radius:10px;box-shadow:0 6px 20px rgba(0,54,74,.18);z-index:1300;max-height:230px;overflow:auto"></div>
@@ -844,7 +844,7 @@ function residentGo(){
     if(navigator.geolocation){
       navigator.geolocation.getCurrentPosition(pos=>{
         startPt={lat:pos.coords.latitude,lng:pos.coords.longitude};
-        document.getElementById('residentStartVal').textContent=startPt.lat.toFixed(4)+', '+startPt.lng.toFixed(4);
+        const rsv1=document.getElementById('residentStartVal'); if(rsv1) rsv1.textContent=startPt.lat.toFixed(4)+', '+startPt.lng.toFixed(4);
         routeResident(startPt,d);
       },()=>routeResident(null,d),{timeout:6000,maximumAge:30000});
       return;
@@ -878,7 +878,7 @@ function recenterOnMe(){
   if(navigator.geolocation){
     navigator.geolocation.getCurrentPosition(pos=>{
       startPt={lat:pos.coords.latitude,lng:pos.coords.longitude};
-      document.getElementById('residentStartVal').textContent='Your location';
+      const rsv2=document.getElementById('residentStartVal'); if(rsv2) rsv2.textContent='Your location';
       map.setView([startPt.lat,startPt.lng], driveZoom());
     },()=>setStatus('Location unavailable — check permissions.'),{timeout:6000,maximumAge:20000});
   } else setStatus('Geolocation not supported.');
@@ -891,13 +891,14 @@ function residentClearRoute(){
   drivePath=null;
   destPt=null; startPt=null;
   document.getElementById('residentDestInput').value='';
-  document.getElementById('residentStartVal').textContent='Use my location';
+  const rsv3=document.getElementById('residentStartVal'); if(rsv3) rsv3.textContent='Use my location';
   destMarker&&map.removeLayer(destMarker); destMarker=null;
   const rb=document.getElementById('residentStatusBar'); if(rb){rb.style.display='none';}
   setStatus('Route cleared.');
 }
 document.getElementById('residentClear').addEventListener('click',residentClearRoute);
-document.getElementById('residentStartBtn').addEventListener('click',()=>{armField('start');document.getElementById('residentStartVal').textContent='tap map…';});
+document.getElementById('tripDone').addEventListener('click',residentClearRoute);
+document.getElementById('residentStartBtn').addEventListener('click',()=>{armField('start');const rsv4=document.getElementById('residentStartVal'); if(rsv4) rsv4.textContent='tap map…';});
 const LOGOS=[
   {name:'spray waterpark', url:'https://d2ol7oe51mr4n9.cloudfront.net/user_3GMMpPAbADd1bMVZfaXlzG5p6dM/dd8c7aa0-2581-4746-a637-f9a83168843b.png', w:56, anchor:[28,52]},
   {name:'blue water', url:'https://d2ol7oe51mr4n9.cloudfront.net/user_3GMMpPAbADd1bMVZfaXlzG5p6dM/36a7aa76-8036-4173-8267-c508382c2986.png', w:72, anchor:[36,34], place:{lat:30.100403,lng:-81.416122}},
@@ -941,9 +942,9 @@ function enterResident(){
   if(navigator.geolocation){
     navigator.geolocation.getCurrentPosition(pos=>{
       startPt={lat:pos.coords.latitude,lng:pos.coords.longitude};
-      document.getElementById('residentStartVal').textContent='Your location';
+      const rsv2=document.getElementById('residentStartVal'); if(rsv2) rsv2.textContent='Your location';
       map.setView([startPt.lat,startPt.lng],14);
-    },()=>{ document.getElementById('residentStartVal').textContent='Use my location'; },{timeout:6000,maximumAge:120000});
+    },()=>{ const rsv3=document.getElementById('residentStartVal'); if(rsv3) rsv3.textContent='Use my location'; },{timeout:6000,maximumAge:120000});
   }
 }
 function armDev(){
