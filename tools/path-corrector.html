@@ -65,6 +65,19 @@
     <button id="tabDev" class="on devTag">Developer</button>
   </div>
 </div>
+<div id="residentBar" style="display:none;position:fixed;top:66px;left:50%;transform:translateX(-50%);z-index:1100;background:#fff;border:1px solid #dbe3e5;border-radius:999px;box-shadow:0 4px 16px rgba(0,54,74,.16);padding:8px 12px;display:none;gap:8px;align-items:center;max-width:min(560px,92vw)">
+  <div style="display:flex;flex-direction:column;font-size:11px;min-width:0">
+    <span style="color:#7a929b;font-weight:600">STARTING</span>
+    <span id="residentStartVal" style="color:#00364a;font-weight:700;white-space:nowrap">Use my location</span>
+  </div>
+  <button id="residentStartBtn" style="background:#e6f3f6;border:1px solid #0099ba;color:#00788f;border-radius:999px;padding:5px 10px;font:600 11px Outfit">Set point</button>
+  <div style="width:1px;height:28px;background:#dbe3e5"></div>
+  <div style="display:flex;flex-direction:column;font-size:11px;min-width:0;flex:1">
+    <span style="color:#0099ba;font-weight:600">DESTINATION</span>
+    <select id="residentDest" style="border:0;outline:0;background:transparent;color:#00364a;font:700 13px Outfit;max-width:220px"></select>
+  </div>
+  <button id="residentGo" style="background:#0099ba;color:#fff;border:0;border-radius:999px;padding:6px 14px;font:700 12px Outfit">GO</button>
+</div>
 <div id="panel">
   <h1>🛺 Network editor <button id="btnHide" title="collapse">–</button></h1>
   <div class="mode">
@@ -104,6 +117,7 @@
 </div>
 <div id="devBadge">DEVELOPER</div>
 <script>
+const DESTINATIONS = [{"name": "Nocatee Town Center", "sub": "Shopping, dining, events", "lat": 30.11, "lng": -81.41787}, {"name": "Splash Waterpark", "sub": "Pools, slides, cabanas", "lat": 30.10359, "lng": -81.41623}, {"name": "Spray Waterpark", "sub": "Splash pad for little ones", "lat": 30.100119, "lng": -81.414721}, {"name": "Kids Splash Playground", "sub": "Water play near the lagoon", "lat": 30.10319, "lng": -81.41589}, {"name": "Nocatee Community Park", "sub": "Athletic fields and courts", "lat": 30.09667, "lng": -81.41431}, {"name": "Family Lagoon Pool", "sub": "Resort pool at Town Center", "lat": 30.10373, "lng": -81.41584}, {"name": "Crosswater Hall", "sub": "Community events hall", "lat": 30.1033, "lng": -81.41516}, {"name": "Crosswater Park", "sub": "Neighborhood park", "lat": 30.07135, "lng": -81.40175}, {"name": "Palm Valley Academy", "sub": "Elementary school", "lat": 30.12056, "lng": -81.40763}, {"name": "Ponte Vedra High School", "sub": "Public high school", "lat": 30.11246, "lng": -81.39451}, {"name": "Pine Island Academy", "sub": "Elementary school", "lat": 30.05015, "lng": -81.39475}, {"name": "Publix at Town Center", "sub": "Grocery store", "lat": 30.11054, "lng": -81.41951}, {"name": "Crosswater Community Church", "sub": "Worship", "lat": 30.12156, "lng": -81.39673}, {"name": "Valley Ridge Academy", "sub": "School on the west side", "lat": 30.09867, "lng": -81.45477}, {"name": "Allen D. Nease High School", "sub": "School on the west side", "lat": 30.07942, "lng": -81.44765}, {"name": "Palm Valley Golf Club", "sub": "Golf and dining", "lat": 30.10135, "lng": -81.43561}, {"name": "Cypress Park Pool", "sub": "Pool on the west side", "lat": 30.11564, "lng": -81.455794}, {"name": "Saint John Paul II Church", "sub": "Worship on the west side", "lat": 30.12303, "lng": -81.43508}, {"name": "Nocatee Fitness Club", "sub": "Fitness center & gym", "lat": 30.10318, "lng": -81.41554}, {"name": "Lap Pool", "sub": "Lap swimming lanes", "lat": 30.101855, "lng": -81.415933}, {"name": "Nocatee Welcome Center", "sub": "245 Nocatee Center Way", "lat": 30.103266, "lng": -81.414941}, {"name": "Nocatee Resident Services", "sub": "245 Nocatee Center Way", "lat": 30.1086, "lng": -81.4202}, {"name": "Orangetheory Fitness", "sub": "Town Center studio", "lat": 30.10972, "lng": -81.41809}, {"name": "Crosswater & Preservation Roundabout", "sub": "Trail junction", "lat": 30.1062, "lng": -81.4248}, {"name": "Splash right side", "sub": "Pool decks at Splash", "lat": 30.1036, "lng": -81.4159}, {"name": "Bronx House Pizza", "sub": "Pizza", "lat": 30.108241, "lng": -81.415455}, {"name": "Clean Juice", "sub": "Juice bar", "lat": 30.111483, "lng": -81.419728}, {"name": "Dunkin", "sub": "Coffee", "lat": 30.108403, "lng": -81.415485}, {"name": "Jersey Mike", "sub": "Subs", "lat": 30.10973, "lng": -81.418016}, {"name": "M Shack Nocatee", "sub": "Burgers", "lat": 30.108854, "lng": -81.409526}, {"name": "Publix GreenWise Market", "sub": "Market", "lat": 30.110537, "lng": -81.41951}, {"name": "South Kitchen & Spirits", "sub": "Dining", "lat": 30.108861, "lng": -81.414841}, {"name": "Starbucks Coffee", "sub": "Coffee", "lat": 30.110139, "lng": -81.417387}, {"name": "The Kookaburra Coffee", "sub": "Coffee", "lat": 30.111613, "lng": -81.418896}, {"name": "Loop Restaurant", "sub": "Dining", "lat": 30.111613, "lng": -81.418896}, {"name": "Tijuana Flats", "sub": "Mexican", "lat": 30.110222, "lng": -81.417428}, {"name": "CVS Pharmacy", "sub": "Pharmacy", "lat": 30.108397, "lng": -81.416913}, {"name": "GNC", "sub": "Vitamins", "lat": 30.109701, "lng": -81.418194}, {"name": "Publix Super Market", "sub": "Grocery", "lat": 30.110537, "lng": -81.41951}, {"name": "Verizon Wireless", "sub": "Mobile", "lat": 30.108129, "lng": -81.415436}, {"name": "Baptist Health AgeWell Center", "sub": "Health", "lat": 30.112757, "lng": -81.429209}, {"name": "Orange Theory Fitness", "sub": "Fitness", "lat": 30.109717, "lng": -81.418091}, {"name": "AT&T", "sub": "Mobile", "lat": 30.109662, "lng": -81.418406}, {"name": "The Link (Innovation & Activity Hub)", "sub": "Hub", "lat": 30.109624, "lng": -81.419238}, {"name": "Settler", "sub": "Pond & park loop", "lat": 30.05047, "lng": -81.402303}, {"name": "Salata", "sub": "641 Crosswater Pkwy \u00b7 build-your-own salad", "lat": 30.108333, "lng": -81.415556}, {"name": "Panera Bread", "sub": "Nocatee Town Center", "lat": 30.110457, "lng": -81.418001}, {"name": "Really Good Beer Stop", "sub": "295 Pine Lake Dr \u00b7 craft beer & taps", "lat": 30.110691, "lng": -81.41599}, {"name": "Ben & Jerry", "sub": "295 Pine Lake Dr \u00b7 ice cream", "lat": 30.110681, "lng": -81.415933}, {"name": "Tank", "sub": "Town Center \u00b7 sushi & ramen", "lat": 30.108609, "lng": -81.415643}, {"name": "Tillman", "sub": "West \u00b7 meats & provisions", "lat": 30.081325, "lng": -81.454042}, {"name": "fit20", "sub": "466 Town Plaza Ave \u00b7 strength studio", "lat": 30.109018, "lng": -81.421466}, {"name": "Truist Bank", "sub": "215 Pine Lake Dr \u00b7 at Publix", "lat": 30.109492, "lng": -81.41574}, {"name": "Baggett Law", "sub": "480 Town Plaza Ave \u00b7 personal injury", "lat": 30.108726, "lng": -81.42121}, {"name": "Twenty Mile Park", "sub": "Park on the 20-Mile boundary", "lat": 30.13024, "lng": -81.422716}, {"name": "Twenty Mile Post", "sub": "Historic 20-Mile fire lookout post", "lat": 30.131367, "lng": -81.411996}];
 const GRAPH_URL = new URL("../app/public/data/graph.json", location.href).href;
 const FORBIDDEN = new Set(["preservation trail"]);
 let EV_NAMES=new Set(); // loaded from ev_roads.json (OSM residential-classified)
@@ -468,6 +482,98 @@ document.getElementById('clrDest').addEventListener('click',()=>{destPt=null;doc
 document.getElementById('gapFix').addEventListener('click',()=>gapAction('fix'));
 document.getElementById('gapLegit').addEventListener('click',()=>gapAction('legit'));
 document.getElementById('gapLater').addEventListener('click',()=>gapAction('later'));
+function residentFillDest(){
+  const sel=document.getElementById('residentDest');
+  sel.innerHTML='';
+  DESTINATIONS.forEach(d=>{
+    const o=document.createElement('option');
+    o.value=d.name; o.textContent=d.name+(d.sub?' · '+d.sub:'');
+    sel.appendChild(o);
+  });
+}
+function residentGo(){
+  const sel=document.getElementById('residentDest');
+  const d=DESTINATIONS.find(x=>x.name===sel.value);
+  if(!d){msg.textContent='Pick a destination first.';return;}
+  // use startPt if user set one, else geolocation if available, else map center
+  if(!startPt){
+    if(navigator.geolocation){
+      navigator.geolocation.getCurrentPosition(pos=>{
+        startPt={lat:pos.coords.latitude,lng:pos.coords.longitude};
+        document.getElementById('residentStartVal').textContent=startPt.lat.toFixed(4)+', '+startPt.lng.toFixed(4);
+        routeResident(startPt,d);
+      },()=>routeResident(null,d),{timeout:6000,maximumAge:30000});
+      return;
+    }
+    routeResident(null,d);
+  } else {
+    routeResident(startPt,d);
+  }
+}
+function routeResident(start,d){
+  // pick start: provided, else nearest cart node to destination? No — start required; fallback = map center
+  const destPt={lat:d.lat,lng:d.lng};
+  let startIdx=-1, destIdx=-1;
+  if(startPt){ startIdx=cartNearest(startPt.lat,startPt.lng).idx; }
+  else { // fallback: center of map as start
+    const c=map.getCenter(); startIdx=cartNearest(c.lat,c.lng).idx; }
+  destIdx=cartNearest(destPt.lat,destPt.lng).idx;
+  if(startIdx<0||destIdx<0){ msg.textContent='No cart network near that destination.'; return; }
+  if(compOf[startIdx]!==compOf[destIdx]){ msg.textContent='No cart route from here to "'+d.name+'" (different network clusters).'; showRoute(null); return; }
+  const adj=buildCartAdj(); const r=dijkstraCart(startIdx,destIdx,adj);
+  if(!r){ msg.textContent='No cart route to "'+d.name+'".'; showRoute(null); }
+  else {
+    showRoute(r.path);
+    // move map to show route
+    const ll=r.path.map(i=>[G.nodes[i*2],G.nodes[i*2+1]]);
+    map.fitBounds(ll,{padding:[60,60]});
+    msg.textContent='Route to '+d.name+': '+Math.round(r.dist)+'m · '+(r.path.length-1)+' segments. (Developer tab for details.)';
+  }
+}
+document.getElementById('residentGo').addEventListener('click',residentGo);
+document.getElementById('residentStartBtn').addEventListener('click',()=>{armField('start');document.getElementById('residentStartVal').textContent='tap map…';});
+function enterResident(){
+  document.getElementById('panel').style.display='none';
+  document.getElementById('residentBar').style.display='flex';
+  // hide all dev overlays for a clean user map
+  if(requestAnimationFrame||true){ if(network)map.removeLayer(network); if(gapLayer)map.removeLayer(gapLayer); }
+  // hide the dev badge
+  const db=document.getElementById('devBadge'); if(db)db.style.display='none';
+  document.getElementById('tabMap').classList.add('on');
+  document.getElementById('tabDev').classList.remove('on');
+  residentFillDest();
+  // try auto location
+  if(navigator.geolocation){
+    navigator.geolocation.getCurrentPosition(pos=>{
+      startPt={lat:pos.coords.latitude,lng:pos.coords.longitude};
+      document.getElementById('residentStartVal').textContent='Your location';
+      map.setView([startPt.lat,startPt.lng],14);
+    },()=>{ document.getElementById('residentStartVal').textContent='Use my location'; },{timeout:6000,maximumAge:120000});
+  }
+}
+function armDev(){
+  document.getElementById('residentBar').style.display='none';
+  document.getElementById('panel').style.display='block';
+  document.getElementById('devBadge').style.display='block';
+  ensureNetwork();
+  drawGapMarkers&&drawGapMarkers();
+  document.getElementById('tabDev').classList.add('on');
+  document.getElementById('tabMap').classList.remove('on');
+}
+// tab wiring: Map -> resident (clean user map), Developer -> editor
+const oldMapTab=document.getElementById('tabMap'); const oldDevTab=document.getElementById('tabDev');
+oldMapTab.addEventListener('click',()=>{ // just in case duplicates, guard
+  enterResident();
+});
+oldDevTab.addEventListener('click',()=>{ enterDev(); });
+function enterDev(){
+  document.getElementById('residentBar').style.display='none';
+  document.getElementById('panel').style.display='block';
+  const db=document.getElementById('devBadge'); if(db)db.style.display='block';
+  ensureNetwork();
+  document.getElementById('tabDev').classList.add('on');
+  document.getElementById('tabMap').classList.remove('on');
+}
 document.getElementById('tabMap').addEventListener('click',()=>{document.getElementById('panel').style.display='none';document.getElementById('tabMap').classList.add('on');document.getElementById('tabDev').classList.remove('on');});
 document.getElementById('tabDev').addEventListener('click',()=>{document.getElementById('panel').style.display='block';document.getElementById('tabDev').classList.add('on');document.getElementById('tabMap').classList.remove('on');});
 document.getElementById('gapsMode').addEventListener('click',function(){ this.classList.toggle('on');
