@@ -92,6 +92,7 @@ function isCartLegal(i){
   const ni=G.edgesNameIdx[i];
   if(ni>=0&&FORBIDDEN.has(G.names[ni].toLowerCase()))return false;
   if(ni>=0&&removedNames.has(G.names[ni]))return false;
+  if(removedEdges.has(i))return false;
   if(G.edgesPath && G.edgesPath[i]===1)return true;
   if(G.edgesEV && G.edgesEV[i]===1)return true;
   return evSet.has(ni>=0?G.names[ni].toLowerCase():"");
@@ -215,9 +216,15 @@ map.on("click",e=>{
     }
     if(best===null){msg.textContent="No cart line nearby to remove.";return;}
     const ni=G.edgesNameIdx[best];
-    const nm=ni>=0?G.names[ni]:"(unnamed segment)";
-    if(removedNames.has(nm)){removedNames.delete(nm);msg.textContent="Restored: "+nm;}
-    else{removedNames.add(nm);msg.textContent="REMOVED from cart network: "+nm+" — click again to restore.";}
+    const nm=ni>=0?G.names[ni]:"";
+    if(nm){
+      if(removedNames.has(nm)){removedNames.delete(nm);msg.textContent="Restored: "+nm;}
+      else{removedNames.add(nm);msg.textContent="REMOVED: "+nm+" — click again to restore.";}
+    } else {
+      const key=best;
+      if(removedEdges.has(key)){removedEdges.delete(key);msg.textContent="Restored unnamed segment #"+best;}
+      else{removedEdges.add(key);msg.textContent="REMOVED unnamed segment (edge #"+best+") — click again to restore.";}
+    }
     exportBtn.disabled=false;
     ensureNetwork();
     return;
@@ -261,7 +268,7 @@ map.on("dblclick",e=>{ if(mode==="draw"){ e.originalEvent.preventDefault(); endD
 fixBtn.onclick=()=>{mode="fix";fixBtn.classList.add("on");testBtn.classList.remove("on");drawBtn.classList.remove("on");removeBtn.classList.remove("on");selNode=null;clearPreview();clearRoute();msg.textContent="Fix mode: click a cart point, then click where it should land (snaps to nearest line).";};
 testBtn.onclick=()=>{mode="test";testBtn.classList.add("on");fixBtn.classList.remove("on");drawBtn.classList.remove("on");removeBtn.classList.remove("on");lastStart=null;clearPreview();clearRoute();msg.textContent="Test mode: click start, then destination.";};
 const removeBtn=document.getElementById("mRemove");
-let removedNames=new Set();
+let removedNames=new Set(); let removedEdges=new Set();
 removeBtn.onclick=()=>{mode="remove";removeBtn.classList.add("on");testBtn.classList.remove("on");fixBtn.classList.remove("on");drawBtn.classList.remove("on");clearPreview();clearRoute();msg.textContent="Remove mode: click a ROAD or TRAIL line to remove it from the cart network. Click again to undo.";};
 const drawBtn=document.getElementById("mDraw");
 let drawPts=[], drawPoly=null;
@@ -306,6 +313,7 @@ exportBtn.onclick=()=>{
   out.user_ev_roads=Array.from(evSet);
   out.user_gap_status=(GAPS||[]).filter(g=>g.status!=='open').map(g=>({i:g.i,j:g.j,status:g.status,d:g.d}));
   out.user_removed_names=Array.from(removedNames);
+  out.user_removed_edges=Array.from(removedEdges);
   const blob=new Blob([JSON.stringify(out)],{type:"application/json"});
   const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="graph.json";a.click();
   exportBtn.disabled=true;stat.textContent="exported (incl. "+evSet.size+" user EV roads) — bring this file back.";
