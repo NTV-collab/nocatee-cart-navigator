@@ -75,7 +75,8 @@
   <div style="display:flex;flex-direction:column;font-size:11px;min-width:0;flex:1">
     <span style="color:#0099ba;font-weight:600">DESTINATION</span>
     <input id="residentDestInput" list="destPicklist" placeholder="Business or address in Nocatee…" style="border:0;outline:0;background:transparent;color:#00364a;font:700 13px Outfit;width:100%"/>
-    <datalist id="destPicklist"></datalist>
+    <datalist id="destPicklist" style="display:none"></datalist>
+    <div id="destAuto" style="display:none;position:absolute;top:100%;left:0;right:0;margin-top:2px;background:#fff;border:1px solid #dbe3e5;border-radius:10px;box-shadow:0 6px 20px rgba(0,54,74,.18);z-index:1300;max-height:230px;overflow:auto"></div>
   </div>
   <button id="residentGo" style="background:#0099ba;color:#fff;border:0;border-radius:999px;padding:6px 14px;font:700 12px Outfit">GO</button>
 </div>
@@ -483,15 +484,24 @@ document.getElementById('clrDest').addEventListener('click',()=>{destPt=null;doc
 document.getElementById('gapFix').addEventListener('click',()=>gapAction('fix'));
 document.getElementById('gapLegit').addEventListener('click',()=>gapAction('legit'));
 document.getElementById('gapLater').addEventListener('click',()=>gapAction('later'));
-function residentFillDest(){
-  const dl=document.getElementById('destPicklist');
-  dl.innerHTML='';
-  DESTINATIONS.forEach(d=>{
-    const o=document.createElement('option');
-    o.value=d.name+(d.sub?' · '+d.sub:'');
-    dl.appendChild(o);
-  });
+function residentFillDest(){ /* autocomplete driven live on input */ }
+function doAutocomplete(){
+  const box=document.getElementById('destAuto');
+  const val=(document.getElementById('residentDestInput').value||'').trim();
+  if(!val){ box.style.display='none'; return; }
+  const q=val.toLowerCase();
+  const hits=DESTINATIONS.filter(d=>(d.name+' '+(d.sub||'')).toLowerCase().includes(q)).slice(0,12);
+  if(!hits.length){ box.style.display='none'; return; }
+  box.innerHTML=hits.map(h=>`<div class="autopt" data-name="${h.name.replace(/"/g,'&quot;')}" style="padding:7px 10px;cursor:pointer;border-bottom:1px solid #f0f0f0;font-size:12px"><b>${h.name}</b>${h.sub?' <span style="color:#7a929b">· '+h.sub+'</span>':''}</div>`).join('');
+  box.style.display='block';
+  box.querySelectorAll('.autopt').forEach(el=>el.addEventListener('click',()=>{
+    const nm=el.dataset.name;
+    document.getElementById('residentDestInput').value=nm;
+    box.style.display='none';
+  }));
 }
+document.getElementById('residentDestInput').addEventListener('input',doAutocomplete);
+document.getElementById('residentDestInput').addEventListener('blur',()=>setTimeout(()=>{document.getElementById('destAuto').style.display='none';},200));
 const GOOGLE_MAPS_API_KEY = "AIzaSyBKp5i4Yr9mQ1R8X8QUtue2s6Bn0yNOEJk"; // ← paste your key here
 function geocodeGoogle(q){
   if(!GOOGLE_MAPS_API_KEY || GOOGLE_MAPS_API_KEY.indexOf("YOUR_")===0){
