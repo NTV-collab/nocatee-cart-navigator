@@ -374,7 +374,19 @@ function closeTurnOverlay(){
 }
 document.getElementById('turnClose').addEventListener('click',closeTurnOverlay);
 document.getElementById('nextTurn').addEventListener('click',openTurnOverlay);
-let watchId=null, youMarker=null, progIdx=0;
+let watchId=null, youMarker=null, progIdx=0, currentDestPt=null;
+let rerouteGuard=false;
+function resolveDestPt(){
+  if(destPt) return destPt;
+  const inpD=document.getElementById('residentDestInput');
+  const v=inpD?inpD.value.trim():'';
+  if(!v) return null;
+  const d=DESTINATIONS.find(x=>x.name.toLowerCase()===v.toLowerCase())||DESTINATIONS.find(x=>v.toLowerCase().startsWith(x.name.toLowerCase()));
+  if(d) return {lat:d.lat,lng:d.lng};
+  if(destMarker) return {lat:destMarker.getLatLng().lat,lng:destMarker.getLatLng().lng};
+  return null;
+}
+
 function ensureWatch(){
   if(watchId!==null||!navigator.geolocation) return;
   watchId=navigator.geolocation.watchPosition(pos=>{
@@ -383,6 +395,29 @@ function ensureWatch(){
     if(!youMarker){ youMarker=L.circleMarker([lat,lng],{radius:9,color:'#fff',weight:2,fillColor:'#0099ba',fillOpacity:1}).addTo(map); }
     else youMarker.setLatLng([lat,lng]);
     if(driveMode&&drivePath){
+      // deviation detection
+      const dMin=nearestDistOnRoute(drivePath,lat,lng);
+      if(dMin.d>40 && !rerouteGuard){
+        rerouteGuard=true;
+        showRerouteBadge();
+        const dest=resolveDestPt();
+        const fromIdx=cartNearest(lat,lng);
+        const destIdx=dest&&dest.lat?cartNearest(dest.lat,dest.lng):null;
+        if(fromIdx.idx<0||!destIdx||destIdx.idx<0||compOf[fromIdx.idx]!==compOf[destIdx.idx]){
+          setStatus('Re-route unavailable (off network). Set destination again.');
+          clearRoute(); exitDrive();
+          setTimeout(()=>{rerouteGuard=false;},500);
+          return;
+        }
+        const adj=buildCartAdj(), r=dijkstraCart(fromIdx.idx,destIdx.idx,adj);
+        if(!r){ setStatus('Re-route failed — no legal path. Set destination again.'); clearRoute(); exitDrive(); setTimeout(()=>{rerouteGuard=false;},500); return; }
+        drivePath=r.path; updateNextTurn(0);
+        const b=document.getElementById('rerouteBadge'); if(b) b.remove();
+        const nb=document.createElement('div'); nb.id='rerouteBadge'; nb.style.cssText='position:fixed;top:58px;left:12px;z-index:1100;background:#ba5700;color:#fff;font:700 11px Outfit;padding:6px 12px;border-radius:999px'; nb.textContent='Re-routed ✓';
+        document.body.appendChild(nb); setTimeout(()=>{const x=document.getElementById('rerouteBadge'); if(x)x.remove();},1800);
+        setTimeout(()=>{rerouteGuard=false;},2500);
+        return;
+      }
       const idx=nearestOnRoutePath(drivePath,lat,lng);
       progIdx=idx;
       map.setView([lat,lng],17,{animate:false});
@@ -390,14 +425,17 @@ function ensureWatch(){
     }
   }, err=>console.warn('gps err',err), {enableHighAccuracy:true, maximumAge:1500, timeout:12000});
 }
-function nearestOnRoutePath(path,lat,lng){
+function nearestDistOnRoute(path,lat,lng){
   let b=0,bd=1e18;
   for(let i=0;i<path.length;i++){
     const d=hav([G.nodes[path[i]*2],G.nodes[path[i]*2+1]],[lat,lng]);
     if(d<bd){bd=d;b=i;}
   }
-  return b;
+  return {idx:b,d:bd};
 }
+function showRerouteBadge(txt){ const oldB=document.getElementById('rerouteBadge'); if(oldB)oldB.remove(); const b=document.createElement('div'); b.id='rerouteBadge'; b.style.cssText='position:fixed;top:58px;left:12px;z-index:1100;background:#ba5700;color:#fff;font:700 11px Outfit;padding:6px 12px;border-radius:999px'; b.textContent=txt||'Re-routing…'; document.body.appendChild(b); setTimeout(()=>{const x=document.getElementById('rerouteBadge'); if(x)x.remove();},2000); }
+function nearestOnRoutePath(path,lat,lng){ return nearestDistOnRoute(path,lat,lng).idx; }
+
 function enterDrive(){
   if(!drivePath){ return; }
   driveMode=true;
