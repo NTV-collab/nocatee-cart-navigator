@@ -829,16 +829,24 @@ function routeResident(start,d){
 }
 document.getElementById('residentGo').addEventListener('click',()=>{ residentGo(); setTimeout(()=>{ if(drivePath&&drivePath.length>1) enterDrive(); }, 400); });
 document.getElementById('residentStartBtn').addEventListener('click',()=>{armField('start');document.getElementById('residentStartVal').textContent='tap map…';});
-const SPRAY_LOGO_URL='https://d2ol7oe51mr4n9.cloudfront.net/user_3GMMpPAbADd1bMVZfaXlzG5p6dM/dd8c7aa0-2581-4746-a637-f9a83168843b.png';
-let sprayMarker=null;
-function addSprayLogo(){
-  if(sprayMarker){ map.removeLayer(sprayMarker); sprayMarker=null; }
-  const sp=(DESTINATIONS||[]).find(x=>x.name.toLowerCase().includes('spray'));
-  if(!sp) return;
-  const ic=L.divIcon({className:'',html:'<img src="'+SPRAY_LOGO_URL+'" alt="Spray" style="width:90px;height:90px;object-fit:contain;pointer-events:none"/>',iconSize:[90,90],iconAnchor:[45,85]});
-  sprayMarker=L.marker([sp.lat,sp.lng],{icon:ic,interactive:false,zIndexOffset:600}).addTo(map);
+const LOGOS=[
+  {name:'spray waterpark', url:'https://d2ol7oe51mr4n9.cloudfront.net/user_3GMMpPAbADd1bMVZfaXlzG5p6dM/dd8c7aa0-2581-4746-a637-f9a83168843b.png', w:90, anchor:[45,85]},
+  {name:'blue water', url:'https://d2ol7oe51mr4n9.cloudfront.net/user_3GMMpPAbADd1bMVZfaXlzG5p6dM/36a7aa76-8036-4173-8267-c508382c2986.png', w:72, anchor:[36,34], place:{lat:30.100403,lng:-81.416122}},
+];
+let logoSegMarkers=[];
+function addLogos(){
+  removeLogos();
+  LOGOS.forEach(lg=>{
+    let p=lg.place;
+    if(!p){ const d=(DESTINATIONS||[]).find(x=>x.name.toLowerCase().includes(lg.name)); if(d) p={lat:d.lat,lng:d.lng}; }
+    if(!p) return;
+    const ic=L.divIcon({className:'',html:'<img src="'+lg.url+'" alt="" style="width:'+lg.w+'px;height:auto;object-fit:contain;pointer-events:none"/>',iconSize:[lg.w,lg.w],iconAnchor:[lg.anchor[0],lg.anchor[1]]});
+    const m=L.marker([p.lat,p.lng],{icon:ic,interactive:false,zIndexOffset:600}).addTo(map);
+    logoSegMarkers.push(m);
+  });
 }
-function removeSprayLogo(){ if(sprayMarker){ map.removeLayer(sprayMarker); sprayMarker=null; } }
+function removeLogoSeg(){ logoSegMarkers.forEach(m=>map.removeLayer(m)); logoSegMarkers=[]; }
+function removeLogos(){ removeLogoSeg(); }
 function enterResident(){
   document.getElementById('panel').style.display='none';
   document.getElementById('residentBar').style.display='flex';
@@ -850,7 +858,7 @@ function enterResident(){
   document.getElementById('tabMap').classList.add('on');
   document.getElementById('tabDev').classList.remove('on');
   residentFillDest();
-  addSprayLogo();
+  addLogos();
   // try auto location
   if(navigator.geolocation){
     navigator.geolocation.getCurrentPosition(pos=>{
@@ -876,7 +884,7 @@ oldMapTab.addEventListener('click',()=>{ // just in case duplicates, guard
 });
 oldDevTab.addEventListener('click',()=>{ enterDev(); });
 function enterDev(){
-  removeSprayLogo();
+  removeLogos();
   document.getElementById('residentBar').style.display='none';
   document.getElementById('panel').style.display='block';
   const db=document.getElementById('devBadge'); if(db)db.style.display='block';
