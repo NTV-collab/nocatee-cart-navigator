@@ -74,7 +74,7 @@
     <button id="tabDev" class="devTag">Developer</button>
   </div>
 </div>
-<div id="residentBar" style="display:flex;position:fixed;top:66px;left:50%;transform:translateX(-50%);z-index:1100;background:#fff;border:1px solid #dbe3e5;border-radius:18px;box-shadow:0 4px 16px rgba(0,54,74,.16);padding:10px 12px;display:none;flex-direction:row;gap:8px;align-items:center;max-width:min(600px,94vw);width:max-content">
+<div id="residentBar" style="display:flex;position:fixed;top:66px;left:50%;transform:translateX(-50%);z-index:1100;background:#fff;border:1px solid #dbe3e5;border-radius:18px;box-shadow:0 4px 16px rgba(0,54,74,.16);padding:10px 12px;flex-direction:row;gap:8px;align-items:center;max-width:min(600px,94vw);width:max-content">
   <div class="rrow" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
   <div style="display:flex;flex-direction:column;font-size:11px;min-width:120px;flex:1;position:relative">
     <span style="color:#00788f;font-weight:700;font-size:11px;letter-spacing:.4px">WHERE TO?</span>
@@ -89,7 +89,7 @@
   </div>
   <div id="residentStatusBar" style="font-size:11px;color:#2e5562;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:none"></div>
 </div>
-<div id="panel">
+<div id="panel" style="display:none;position:fixed;z-index:1200;left:12px;bottom:12px;top:66px;width:min(330px,94vw);background:#fff;color:#00364a;border:1px solid #dbe3e5;border-radius:18px;box-shadow:0 8px 28px rgba(0,54,74,.16);padding:14px;overflow:auto;font-size:13px">
   <h1>🛺 Network editor <button id="btnHide" title="collapse">–</button></h1>
   <div class="mode">
     <button id="mTest" class="on">Test route</button>
