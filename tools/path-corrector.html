@@ -74,7 +74,8 @@
   <div style="width:1px;height:28px;background:#dbe3e5"></div>
   <div style="display:flex;flex-direction:column;font-size:11px;min-width:0;flex:1">
     <span style="color:#0099ba;font-weight:600">DESTINATION</span>
-    <select id="residentDest" style="border:0;outline:0;background:transparent;color:#00364a;font:700 13px Outfit;max-width:220px"></select>
+    <input id="residentDestInput" list="destPicklist" placeholder="Type any address or business…" style="border:0;outline:0;background:transparent;color:#00364a;font:700 13px Outfit;width:100%"/>
+    <datalist id="destPicklist"></datalist>
   </div>
   <button id="residentGo" style="background:#0099ba;color:#fff;border:0;border-radius:999px;padding:6px 14px;font:700 12px Outfit">GO</button>
 </div>
@@ -483,18 +484,46 @@ document.getElementById('gapFix').addEventListener('click',()=>gapAction('fix'))
 document.getElementById('gapLegit').addEventListener('click',()=>gapAction('legit'));
 document.getElementById('gapLater').addEventListener('click',()=>gapAction('later'));
 function residentFillDest(){
-  const sel=document.getElementById('residentDest');
-  sel.innerHTML='';
+  const dl=document.getElementById('destPicklist');
+  dl.innerHTML='';
   DESTINATIONS.forEach(d=>{
     const o=document.createElement('option');
-    o.value=d.name; o.textContent=d.name+(d.sub?' · '+d.sub:'');
-    sel.appendChild(o);
+    o.value=d.name+(d.sub?' · '+d.sub:'');
+    dl.appendChild(o);
   });
 }
+function geocodeNominatim(q){
+  return fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=us&addressdetails=1&q='+encodeURIComponent(q),{headers:{'Accept':'application/json'}})
+    .then(r=>r.json()).then(arr=>arr[0]||null).catch(()=>null);
+}
+let destMarker=null;
+function routeToPoint(dp){
+  const startIdx=startPt?cartNearest(startPt.lat,startPt.lng).idx:cartNearest(map.getCenter().lat,map.getCenter().lng).idx;
+  const destIdx=cartNearest(dp.lat,dp.lng).idx;
+  if(startIdx<0||destIdx<0){ msg.textContent='No cart network near that spot.'; return; }
+  if(compOf[startIdx]!==compOf[destIdx]){ msg.textContent='No cart route from here to there (different network clusters).'; showRoute(null); return; }
+  const adj=buildCartAdj(); const r=dijkstraCart(startIdx,destIdx,adj);
+  if(!r){ msg.textContent='No cart route to that spot.'; showRoute(null); }
+  else { showRoute(r.path); map.fitBounds(r.path.map(i=>[G.nodes[i*2],G.nodes[i*2+1]]),{padding:[60,60]}); msg.textContent='Route: '+Math.round(r.dist)+' m.'; }
+}
 function residentGo(){
-  const sel=document.getElementById('residentDest');
-  const d=DESTINATIONS.find(x=>x.name===sel.value);
-  if(!d){msg.textContent='Pick a destination first.';return;}
+  const inp=document.getElementById('residentDestInput');
+  const val=(inp.value||'').trim();
+  let d=DESTINATIONS.find(x=>x.name.toLowerCase()===val.toLowerCase()) || DESTINATIONS.find(x=>val.toLowerCase().startsWith(x.name.toLowerCase()));
+  if(!d && val){
+    msg.textContent='Geocoding "'+val+'"…';
+    geocodeNominatim(val).then(res=>{
+      if(!res){ msg.textContent='Could not find that address — try another.'; return; }
+      const dp={lat:parseFloat(res.lat),lng:parseFloat(res.lon)};
+      if(destMarker){map.removeLayer(destMarker);}
+      destMarker=L.circleMarker([dp.lat,dp.lng],{radius:7,color:'#fff',weight:2,fillColor:'#d33f4e',fillOpacity:1}).addTo(map);
+      routeToPoint(dp);
+      msg.textContent='Destination: '+res.display_name;
+      return;
+    });
+    return;
+  }
+  if(!d){msg.textContent='Type a destination (or pick one from the list).';return;}
   // use startPt if user set one, else geolocation if available, else map center
   if(!startPt){
     if(navigator.geolocation){
