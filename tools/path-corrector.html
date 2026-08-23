@@ -865,7 +865,7 @@ function enterResident(){
   document.getElementById('tabMap').classList.add('on');
   document.getElementById('tabDev').classList.remove('on');
   residentFillDest();
-  updateLogos();
+  updateLogoZoom();
   // try auto location
   if(navigator.geolocation){
     navigator.geolocation.getCurrentPosition(pos=>{
@@ -885,7 +885,7 @@ function armDev(){
   document.getElementById('tabMap').classList.remove('on');
 }
 // tab wiring: Map -> resident (clean user map), Developer -> editor
-map.on('zoomend',()=>{ updateLogos(); });
+map.on('zoomend',()=>{ updateLogoZoom(); });
 const oldMapTab=document.getElementById('tabMap'); const oldDevTab=document.getElementById('tabDev');
 oldMapTab.addEventListener('click',()=>{ // just in case duplicates, guard
   enterResident();
