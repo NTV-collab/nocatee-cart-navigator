@@ -319,6 +319,8 @@ function exitDrive(){
   driveMode=false;
   document.getElementById('nextTurn').style.display='none';
   document.getElementById('nextTurnText').textContent='—';
+  if(watchId!==null){ navigator.geolocation.clearWatch(watchId); watchId=null; }
+  if(youMarker){ map.removeLayer(youMarker); youMarker=null; }
 }
 function bearingAng(a,b){
   const toR=d=>d*Math.PI/180;
@@ -371,13 +373,38 @@ function closeTurnOverlay(){
 }
 document.getElementById('turnClose').addEventListener('click',closeTurnOverlay);
 document.getElementById('nextTurn').addEventListener('click',openTurnOverlay);
+let watchId=null, youMarker=null, progIdx=0;
+function ensureWatch(){
+  if(watchId!==null||!navigator.geolocation) return;
+  watchId=navigator.geolocation.watchPosition(pos=>{
+    const lat=pos.coords.latitude, lng=pos.coords.longitude;
+    // move "you" marker
+    if(!youMarker){ youMarker=L.circleMarker([lat,lng],{radius:9,color:'#fff',weight:2,fillColor:'#0099ba',fillOpacity:1}).addTo(map); }
+    else youMarker.setLatLng([lat,lng]);
+    if(driveMode&&drivePath){
+      const idx=nearestOnRoutePath(drivePath,lat,lng);
+      progIdx=idx;
+      map.setView([lat,lng],17,{animate:false});
+      updateNextTurn(idx);
+    }
+  }, err=>console.warn('gps err',err), {enableHighAccuracy:true, maximumAge:1500, timeout:12000});
+}
+function nearestOnRoutePath(path,lat,lng){
+  let b=0,bd=1e18;
+  for(let i=0;i<path.length;i++){
+    const d=hav([G.nodes[path[i]*2],G.nodes[path[i]*2+1]],[lat,lng]);
+    if(d<bd){bd=d;b=i;}
+  }
+  return b;
+}
 function enterDrive(){
   if(!drivePath){ return; }
   driveMode=true;
   document.getElementById('nextTurn').style.display='flex';
   updateNextTurn(0);
-  const s0=[G.nodes[drivePath[0]*2],G.nodes[drivePath[0]*2+1]];
-  map.setView(s0,17,{animate:true});
+  const s0=startPt||[G.nodes[drivePath[0]*2],G.nodes[drivePath[0]*2+1]];
+  map.setView([s0.lat||s0[0],s0.lng||s0[1]],17,{animate:true});
+  ensureWatch();
 }
 function updateNextTurn(offset){
   const path=drivePath; if(!path||path.length<2){ document.getElementById('nextTurnText').textContent='Arrive'; return; }
