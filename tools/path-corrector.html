@@ -14,8 +14,8 @@
   #topbar{position:fixed;top:0;left:0;right:0;height:56px;z-index:1100;display:flex;align-items:center;gap:10px;padding:0 14px;background:#00364a;color:#fff;box-shadow:0 2px 10px rgba(0,54,74,.25)}
   #brand{display:flex;align-items:center;gap:10px;min-width:0}
   #badge{width:34px;height:34px;border-radius:50%;background:#0099ba;color:#fff;font-weight:700;font-size:15px;display:flex;align-items:center;justify-content:center;flex:none}
-  #brandName{font-size:15px;font-weight:700;letter-spacing:.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  #brandTag{font-size:10px;font-weight:600;color:#8fd3e0;letter-spacing:.4px}
+  #brandName{font-size:15px;font-weight:700;letter-spacing:.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:38vw}
+  #brandTag{font-size:9px;font-weight:600;color:#8fd3e0;letter-spacing:.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:44vw}
   #tabs{display:flex;gap:6px;margin-left:auto;background:rgba(255,255,255,.12);border-radius:999px;padding:3px}
   #tabs button{border:0;background:transparent;color:#cfe4ea;font:600 12px "Outfit";padding:7px 14px;border-radius:999px;cursor:pointer}
   #tabs button.on{background:#fff;color:#00364a}
@@ -48,6 +48,12 @@
   #devBadge{position:fixed;right:12px;bottom:12px;z-index:1000;background:#ba5700;color:#fff;font:600 10px "Outfit";letter-spacing:.6px;padding:5px 10px;border-radius:999px;box-shadow:0 2px 8px rgba(0,0,0,.2)}
   #gapsMode{background:#fff;border:1px solid #0099ba;color:#00788f;border-radius:999px;padding:7px;font:600 12px "Outfit";cursor:pointer}
   #gapsMode.on{background:#0099ba;color:#fff}
+@media (max-width:700px){
+  #residentBar{width:94vw}
+  .rrow{width:100%}
+  #panel{left:3vw;width:94vw}
+  #residentDestInput{max-width:60vw}
+}
 </style>
 </head>
 <body>
@@ -65,7 +71,8 @@
     <button id="tabDev" class="on devTag">Developer</button>
   </div>
 </div>
-<div id="residentBar" style="display:none;position:fixed;top:66px;left:50%;transform:translateX(-50%);z-index:1100;background:#fff;border:1px solid #dbe3e5;border-radius:999px;box-shadow:0 4px 16px rgba(0,54,74,.16);padding:8px 12px;display:none;gap:8px;align-items:center;max-width:min(560px,92vw)">
+<div id="residentBar" style="display:none;position:fixed;top:66px;left:50%;transform:translateX(-50%);z-index:1100;background:#fff;border:1px solid #dbe3e5;border-radius:18px;box-shadow:0 4px 16px rgba(0,54,74,.16);padding:10px 12px;display:none;flex-direction:column;gap:8px;max-width:min(600px,94vw);width:max-content">
+  <div class="rrow" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
   <div style="display:flex;flex-direction:column;font-size:11px;min-width:0">
     <span style="color:#7a929b;font-weight:600">STARTING</span>
     <span id="residentStartVal" style="color:#00364a;font-weight:700;white-space:nowrap">Use my location</span>
@@ -79,6 +86,7 @@
     <div id="destAuto" style="display:none;position:absolute;top:100%;left:0;right:0;margin-top:2px;background:#fff;border:1px solid #dbe3e5;border-radius:10px;box-shadow:0 6px 20px rgba(0,54,74,.18);z-index:1300;max-height:230px;overflow:auto"></div>
   </div>
   <button id="residentGo" style="background:#0099ba;color:#fff;border:0;border-radius:999px;padding:6px 14px;font:700 12px Outfit">GO</button>
+  </div>
   <div id="residentStatusBar" style="font-size:11px;color:#2e5562;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:none"></div>
 </div>
 <div id="panel">
