@@ -68,8 +68,8 @@
     </div>
   </div>
   <div id="tabs">
-    <button id="tabMap">Map</button>
-    <button id="tabDev" class="on devTag">Developer</button>
+    <button id="tabMap" class="on">Map</button>
+    <button id="tabDev" class="devTag">Developer</button>
   </div>
 </div>
 <div id="residentBar" style="display:none;position:fixed;top:66px;left:50%;transform:translateX(-50%);z-index:1100;background:#fff;border:1px solid #dbe3e5;border-radius:18px;box-shadow:0 4px 16px rgba(0,54,74,.16);padding:10px 12px;display:none;flex-direction:row;gap:8px;align-items:center;max-width:min(600px,94vw);width:max-content">
@@ -835,7 +835,13 @@ const LOGOS=[
   {name:'blue water', url:'https://d2ol7oe51mr4n9.cloudfront.net/user_3GMMpPAbADd1bMVZfaXlzG5p6dM/36a7aa76-8036-4173-8267-c508382c2986.png', w:72, anchor:[36,34], place:{lat:30.100403,lng:-81.416122}},
 ];
 let logoSegMarkers=[];
+const LOGO_MIN_ZOOM=15;
+function updateLogoZoom(){
+  if(document.getElementById('residentBar').style.display!=='flex'){ removeLogos(); return; }
+  if(map.getZoom()>=LOGO_MIN_ZOOM) addLogos(); else removeLogos();
+}
 function addLogos(){
+  if(map.getZoom()<LOGO_MIN_ZOOM){ removeLogos(); return; }
   removeLogos();
   LOGOS.forEach(lg=>{
     let p=lg.place;
@@ -859,7 +865,7 @@ function enterResident(){
   document.getElementById('tabMap').classList.add('on');
   document.getElementById('tabDev').classList.remove('on');
   residentFillDest();
-  addLogos();
+  updateLogos();
   // try auto location
   if(navigator.geolocation){
     navigator.geolocation.getCurrentPosition(pos=>{
@@ -879,6 +885,7 @@ function armDev(){
   document.getElementById('tabMap').classList.remove('on');
 }
 // tab wiring: Map -> resident (clean user map), Developer -> editor
+map.on('zoomend',()=>{ updateLogos(); });
 const oldMapTab=document.getElementById('tabMap'); const oldDevTab=document.getElementById('tabDev');
 oldMapTab.addEventListener('click',()=>{ // just in case duplicates, guard
   enterResident();
@@ -893,8 +900,6 @@ function enterDev(){
   document.getElementById('tabDev').classList.add('on');
   document.getElementById('tabMap').classList.remove('on');
 }
-document.getElementById('tabMap').addEventListener('click',()=>{document.getElementById('panel').style.display='none';document.getElementById('tabMap').classList.add('on');document.getElementById('tabDev').classList.remove('on');});
-document.getElementById('tabDev').addEventListener('click',()=>{document.getElementById('panel').style.display='block';document.getElementById('tabDev').classList.add('on');document.getElementById('tabMap').classList.remove('on');});
 document.getElementById('gapsMode').addEventListener('click',function(){ this.classList.toggle('on');
   gapMode=this.classList.contains('on');
   const lst=document.getElementById('gapsList'); lst.style.display=gapMode?'block':'none';
@@ -908,7 +913,9 @@ fetch(EV_URL).then(r=>r.ok?r.json():[]).then(arr=>{arr.forEach(x=>EV_NAMES.add(S
   .then(()=>fetch(GRAPH_URL)).then(r=>{if(!r.ok)throw new Error("HTTP "+r.status);return r.json();})
   .then(g=>{G=g;computeComponents();ensureNetwork();
     const b=g.bbox||null;if(b)map.fitBounds([[b[0],b[1]],[b[2],b[3]]],{padding:[20,20]});
-  }).catch(e=>{stat.textContent="ERROR: "+e.message;msg.textContent="Graph failed to load.";});
+  }).catch(e=>{stat.textContent="ERROR: "+e.message;setStatus("Graph failed to load.");});
+  // default to the resident Map view on load
+  setTimeout(()=>{ enterResident(); }, 300);
 </script>
 </body>
 </html>
