@@ -893,12 +893,12 @@ function residentClearRoute(){
 document.getElementById('residentClear').addEventListener('click',residentClearRoute);
 document.getElementById('tripDone').addEventListener('click',residentClearRoute);
 document.getElementById('residentStartBtn').addEventListener('click',()=>{armField('start');const rsv4=document.getElementById('residentStartVal'); if(rsv4) rsv4.textContent='tap map…';});
-const LOGOS=[
+var LOGOS=[
   {name:'spray waterpark', url:'https://d2ol7oe51mr4n9.cloudfront.net/user_3GMMpPAbADd1bMVZfaXlzG5p6dM/dd8c7aa0-2581-4746-a637-f9a83168843b.png', w:56, anchor:[28,52]},
   {name:'blue water', url:'https://d2ol7oe51mr4n9.cloudfront.net/user_3GMMpPAbADd1bMVZfaXlzG5p6dM/36a7aa76-8036-4173-8267-c508382c2986.png', w:72, anchor:[36,34], place:{lat:30.100403,lng:-81.416122}},
 ];
 let logoSegMarkers=[];
-const LOGO_MIN_ZOOM=15;
+var LOGO_MIN_ZOOM=15;
 function updateLogoZoom(){
   if(document.getElementById('residentBar').style.display!=='flex'){ removeLogos(); return; }
   if(map.getZoom()>=LOGO_MIN_ZOOM) addLogos(); else removeLogos();
