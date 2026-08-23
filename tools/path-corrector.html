@@ -56,7 +56,7 @@
   #residentRow{width:100%}
 }
 @keyframes logoFadeIn{from{opacity:0;transform:scale(.7)}to{opacity:1;transform:scale(1)}}
-.leaflet-marker-icon.logo-img{animation:logoFadeIn .6s ease}
+.leaflet-marker-icon.logo-img{animation:logoFadeIn .5s ease; -webkit-animation:logoFadeIn .5s ease}
 </style>
 </head>
 <body>
@@ -89,7 +89,18 @@
     <div id="destAuto" style="display:none;position:absolute;top:100%;left:0;right:0;margin-top:2px;background:#fff;border:1px solid #dbe3e5;border-radius:10px;box-shadow:0 6px 20px rgba(0,54,74,.18);z-index:1300;max-height:230px;overflow:auto"></div>
   </div>
   <button id="residentGo" style="background:#0099ba;color:#fff;border:0;border-radius:999px;padding:6px 14px;font:700 12px Outfit">GO</button>
-  <button id="residentClear" style="background:#fff;color:#ba5700;border:1px solid #ba5700;border-radius:999px;padding:5px 12px;font:600 11px Outfit">Clear route</button>
+document.getElementById('residentClear').addEventListener('click',residentClearRoute);
+function recenterOnMe(){
+  if(navigator.geolocation){
+    navigator.geolocation.getCurrentPosition(pos=>{
+      startPt={lat:pos.coords.latitude,lng:pos.coords.longitude};
+      document.getElementById('residentStartVal').textContent='Your location';
+      map.setView([startPt.lat,startPt.lng], driveZoom());
+    },()=>setStatus('Location unavailable — check permissions.'),{timeout:6000,maximumAge:20000});
+  } else setStatus('Geolocation not supported.');
+}
+document.getElementById('recenterBtn').addEventListener('click',recenterOnMe);
+  <button id="recenterBtn" style="background:#e6f3f6;border:1px solid #0099ba;color:#00788f;border-radius:999px;padding:5px 12px;font:600 11px Outfit" title="Recenter on my location">◎ Recenter</button>
   </div>
   <div id="residentStatusBar" style="font-size:11px;color:#2e5562;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:none"></div>
 </div>
@@ -139,7 +150,7 @@
   </div>
   <div id="turnList" style="flex:1;overflow:auto;padding:10px 16px"></div>
 </div>
-<div id="nextTurn" style="display:none;position:fixed;bottom:96px;left:50%;transform:translateX(-50%);z-index:1100;background:#fff;border:1px solid #dbe3e5;border-radius:999px;box-shadow:0 4px 16px rgba(0,54,74,.16);padding:8px 16px;display:none;align-items:center;gap:10px;font-size:13px;cursor:pointer" title="Open full turn-by-turn">
+<div id="nextTurn" style="display:none;position:fixed;bottom:150px;left:50%;transform:translateX(-50%);z-index:1100;background:#fff;border:1px solid #dbe3e5;border-radius:999px;box-shadow:0 4px 16px rgba(0,54,74,.16);padding:8px 16px;display:none;align-items:center;gap:10px;font-size:13px;cursor:pointer" title="Open full turn-by-turn">
   <span id="nextTurnArrow" style="font-size:22px;color:#0099ba;line-height:1">→</span>
   <div>
     <div style="font-weight:700;color:#00364a" id="nextTurnText">—</div>
@@ -864,7 +875,10 @@ function addLogos(){
     if(!p) return;
     const ic=L.divIcon({className:'logo-img',html:'<img src="'+lg.url+'" alt="" style="width:'+lg.w+'px;height:auto;object-fit:contain;pointer-events:none"/>',iconSize:[lg.w,lg.w],iconAnchor:[lg.anchor[0],lg.anchor[1]]});
     const m=L.marker([p.lat,p.lng],{icon:ic,interactive:false,zIndexOffset:600}).addTo(map);
+    // iOS-safe fade: animationend unreliable; force via JS
+    const el=ic; // divIcon; the img
     logoSegMarkers.push(m);
+    setTimeout(()=>{ const img=m._icon&&m._icon.querySelector('img'); if(img){ img.style.opacity='0'; void img.offsetWidth; img.style.transition='opacity .5s ease'; img.style.opacity='1'; } },30);
   });
 }
 function removeLogoSeg(){ logoSegMarkers.forEach(m=>map.removeLayer(m)); logoSegMarkers=[]; }
