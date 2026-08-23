@@ -2,88 +2,107 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Nocatee Cart Network — confirm & correct</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>Nocatee Cart Navigator · Network</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
-  html,body{margin:0;height:100%;font-family:system-ui,sans-serif;background:#111;color:#e6e6e6}
-  #map{position:fixed;inset:0;background:#e5e0d5}
-  #panel{position:fixed;top:10px;left:10px;z-index:1000;width:min(320px,92vw);max-height:88vh;overflow:auto;
-    background:rgba(20,20,20,.93);border:1px solid #333;border-radius:10px;padding:10px;font-size:12px}
-  #panel.collapsed{height:auto;max-height:none;overflow:hidden;padding:6px 10px;cursor:pointer}
-  #panel.collapsed .mode,#panel.collapsed label.tgl,#panel.collapsed #gapsList,#panel.collapsed #gapActions,#panel.collapsed #export,#panel.collapsed .legend,#panel.collapsed #btnHide{display:none!important}
+  html,body{margin:0;height:100%;font-family:"Outfit",ui-sans-serif,system-ui,sans-serif;background:#f6f4ee;color:#00364a}
+  #map{position:fixed;inset:0;background:#efece2}
+  #topbar{position:fixed;top:0;left:0;right:0;height:56px;z-index:1100;display:flex;align-items:center;gap:10px;padding:0 14px;background:#00364a;color:#fff;box-shadow:0 2px 10px rgba(0,54,74,.25)}
+  #brand{display:flex;align-items:center;gap:10px;min-width:0}
+  #badge{width:34px;height:34px;border-radius:50%;background:#0099ba;color:#fff;font-weight:700;font-size:15px;display:flex;align-items:center;justify-content:center;flex:none}
+  #brandName{font-size:15px;font-weight:700;letter-spacing:.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #brandTag{font-size:10px;font-weight:600;color:#8fd3e0;letter-spacing:.4px}
+  #tabs{display:flex;gap:6px;margin-left:auto;background:rgba(255,255,255,.12);border-radius:999px;padding:3px}
+  #tabs button{border:0;background:transparent;color:#cfe4ea;font:600 12px "Outfit";padding:7px 14px;border-radius:999px;cursor:pointer}
+  #tabs button.on{background:#fff;color:#00364a}
+  #tabs button.devTag{background:#ba5700;color:#fff}
+  #panel{position:fixed;z-index:1200;left:12px;bottom:12px;top:66px;width:min(330px,94vw);background:#fff;color:#00364a;border:1px solid #dbe3e5;border-radius:18px;box-shadow:0 8px 28px rgba(0,54,74,.16);padding:14px;overflow:auto;font-size:13px}
+  #panel.collapsed{height:auto;top:auto;overflow:hidden;padding:8px 12px;cursor:pointer}
+  #panel.collapsed .mode,#panel.collapsed label.tgl,#panel.collapsed #gapsList,#panel.collapsed #gapActions,#panel.collapsed #drawActions,#panel.collapsed #savedGapsBox,#panel.collapsed #export,#panel.collapsed .legend,#panel.collapsed #routeFields,#panel.collapsed #btnHide{display:none!important}
   #panel.collapsed h1{margin:0;font-size:14px}
-  #btnHide{background:#222;border:1px solid #444;color:#ccc;border-radius:5px;padding:2px 6px;font-size:11px;float:right}
-  .mode{display:flex;gap:5px;margin:6px 0}
-  .mode button{flex:1;background:#222;color:#ccc;border:1px solid #444;border-radius:6px;padding:6px;cursor:pointer;font-size:12px}
-  .mode button.on{background:#2e7d32;border-color:#2e7d32;color:#fff}
-  h1{font-size:15px;margin:0 0 8px;color:#4caf50}
-  .mode{display:flex;gap:6px;margin:8px 0}
-  .mode button{flex:1;background:#222;color:#ccc;border:1px solid #444;border-radius:6px;padding:6px;cursor:pointer}
-  .mode button.on{background:#2e7d32;border-color:#2e7d32;color:#ffffff}
-  button{padding:6px 10px;border-radius:6px;border:none;cursor:pointer;font-size:13px}
-  #export{background:#2fae9a;color:#062;font-weight:600;width:100%;margin-top:8px}
-  #export:disabled{background:#333;color:#777;cursor:not-allowed}
-  .out{font-size:12px;color:#ddd;white-space:pre-wrap;margin-top:8px;max-height:30vh;overflow:auto}
-  .stat{font-size:11px;color:#999;margin-top:6px}
-  label.tgl{display:flex;align-items:center;gap:6px;font-size:12px;margin-top:8px;color:#ccc;cursor:pointer}
-  .legend{font-size:11px;color:#ccc;margin-top:10px;line-height:1.7}
-  .pill{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+  h1{font-size:15px;margin:0 0 8px;color:#00788f;font-weight:700;display:flex;align-items:center;gap:8px}
+  #btnHide{margin-left:auto;background:#e6f3f6;border:1px solid #0099ba;color:#00788f;border-radius:8px;padding:2px 8px;font:700 12px "Outfit";cursor:pointer}
+  .mode{display:flex;gap:5px;margin:8px 0}
+  .mode button{flex:1;background:#fff;color:#2e5562;border:1px solid #dbe3e5;border-radius:999px;padding:7px 4px;font:600 12px "Outfit";cursor:pointer}
+  .mode button.on{background:#0099ba;border-color:#0099ba;color:#fff}
+  label.tgl{display:flex;align-items:center;gap:6px;font-size:12px;margin-top:7px;color:#2e5562;cursor:pointer}
+  input[type=checkbox]{accent-color:#0099ba}
+  #routeFields{margin:8px 0;display:flex;flex-direction:column;gap:5px;font-size:12px}
+  #routeFields div{display:flex;gap:4px;align-items:center}
+  #routeFields span:first-child{flex:1;color:#2e5562}
+  #routeFields .val{color:#00788f;font-weight:600}
+  #routeFields button{color:#fff;border:0;border-radius:999px;padding:3px 10px;font:600 11px "Outfit";cursor:pointer}
+  #setStart{background:#0099ba}#setDest{background:#ba5700}#clrStart,#clrDest{background:#9db4bc}
+  #export{background:#0099ba;color:#fff;font:700 13px "Outfit";width:100%;margin-top:10px;padding:9px;border-radius:999px;border:0;cursor:pointer}
+  #export:disabled{background:#dbe3e5;color:#7a929b;cursor:not-allowed}
+  #gapsList button{display:block;width:100%;text-align:left;margin:2px 0;background:#f6f4ee;color:#2e5562;border:1px solid #ece8de;border-radius:8px;padding:3px 6px;font-size:11px;cursor:pointer}
+  #savedGapsBox{border-top:1px solid #dbe3e5;margin-top:8px;padding-top:6px}
+  .out{font-size:12px;color:#2e5562;white-space:pre-wrap;margin-top:8px;background:#f6f4ee;border:1px solid #ece8de;border-radius:10px;padding:8px}
+  .stat{font-size:11px;color:#7a929b;margin-top:6px}
+  .legend{font-size:11px;color:#2e5562;margin-top:10px;line-height:1.7}
+  .pill{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+  #devBadge{position:fixed;right:12px;bottom:12px;z-index:1000;background:#ba5700;color:#fff;font:600 10px "Outfit";letter-spacing:.6px;padding:5px 10px;border-radius:999px;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+  #gapsMode{background:#fff;border:1px solid #0099ba;color:#00788f;border-radius:999px;padding:7px;font:600 12px "Outfit";cursor:pointer}
+  #gapsMode.on{background:#0099ba;color:#fff}
 </style>
 </head>
 <body>
 <div id="map"></div>
+<div id="topbar">
+  <div id="brand">
+    <div id="badge">CN</div>
+    <div>
+      <div id="brandName">Nocatee Cart Navigator</div>
+      <div id="brandTag">EV PATH GPS · NETWORK EDITOR</div>
+    </div>
+  </div>
+  <div id="tabs">
+    <button id="tabMap">Map</button>
+    <button id="tabDev" class="on devTag">Developer</button>
+  </div>
+</div>
 <div id="panel">
-  <h1>🛺 Nocatee Cart Network — confirm &amp; correct <button id="btnHide" title="collapse">–</button></h1>
+  <h1>🛺 Network editor <button id="btnHide" title="collapse">–</button></h1>
   <div class="mode">
     <button id="mTest" class="on">Test route</button>
     <button id="mFix">Fix points</button>
     <button id="mDraw">Draw trail</button>
     <button id="mRemove">Remove</button>
   </div>
-  <div id="routeFields" style="margin:8px 0;font-size:12px;display:flex;flex-direction:column;gap:4px">
-    <div style="display:flex;gap:4px;align-items:center">
-      <span style="flex:1;color:#ccc">Starting:</span>
-      <span id="startLabel" style="color:#aaa">—</span>
-      <button id="setStart" style="background:#2e7d32;color:#fff;border:0;border-radius:4px;padding:2px 8px;font-size:11px">Set</button>
-      <button id="clrStart" style="background:#444;color:#fff;border:0;border-radius:4px;padding:2px 6px;font-size:10px" title="clear">✕</button>
-    </div>
-    <div style="display:flex;gap:4px;align-items:center">
-      <span style="flex:1;color:#ccc">Destination:</span>
-      <span id="destLabel" style="color:#aaa">—</span>
-      <button id="setDest" style="background:#d33f4e;color:#fff;border:0;border-radius:4px;padding:2px 8px;font-size:11px">Set</button>
-      <button id="clrDest" style="background:#444;color:#fff;border:0;border-radius:4px;padding:2px 6px;font-size:10px" title="clear">✕</button>
-    </div>
+  <div id="routeFields">
+    <div><span>Starting:</span><span class="val" id="startLabel">—</span><button id="setStart">Set</button><button id="clrStart">✕</button></div>
+    <div><span>Destination:</span><span class="val" id="destLabel">—</span><button id="setDest">Set</button><button id="clrDest">✕</button></div>
   </div>
-  <label class="tgl"><input type="checkbox" id="showOthers" checked> show non-cart roads (gray/blue backdrop)</label>
-  <label class="tgl"><input type="checkbox" id="classifyMode"> classify: click a road to (un)EV-approve it → reconnects live</label>
+  <label class="tgl"><input type="checkbox" id="showOthers" checked> show non-cart roads</label>
+  <label class="tgl"><input type="checkbox" id="classifyMode"> classify: click a road to (un)EV-approve it</label>
   <div class="mode" style="margin-top:8px"><button id="gapsMode">Gaps: show &amp; fix</button></div>
-  <div id="gapsList" style="display:none;max-height:160px;overflow:auto;font-size:11px;margin-top:6px"></div>
-  <div id="gapActions" style="display:none;gap:6px;margin-top:6px">
-    <button id="gapFix" style="background:#2e7d32;color:#fff">Fix (join)</button>
-    <button id="gapLegit" style="background:#555;color:#fff">Legit gap</button>
-    <button id="gapLater" style="background:#1565c0;color:#fff">Save for later</button>
-  </div>
-  <div id="savedGapsBox" style="display:none;margin-top:6px;font-size:11px">
-    <div style="color:#90caf9;margin-bottom:2px" id="savedGapsTitle">Saved for later (0)</div>
+  <div id="gapsList" style="display:none;max-height:150px;overflow:auto;font-size:11px;margin-top:6px"></div>
+  <div id="savedGapsBox" style="display:none">
+    <div style="color:#ba5700;font-weight:700;margin-bottom:2px" id="savedGapsTitle">Saved for later (0)</div>
     <div id="savedGapsList" style="max-height:110px;overflow:auto"></div>
   </div>
-  <div id="drawActions" style="display:none;gap:6px;margin-top:6px">
-    <button id="drawFinish" style="background:#ff9800;color:#111">Finish trail</button>
-    <button id="drawCancel" style="background:#555;color:#fff">Cancel</button>
+  <div id="gapActions" style="display:none;gap:6px;margin-top:6px">
+    <button id="gapFix" style="background:#00788f;color:#fff;border:0;border-radius:999px;padding:5px 10px;font:600 11px Outfit">Fix (join)</button>
+    <button id="gapLegit" style="background:#7a929b;color:#fff;border:0;border-radius:999px;padding:5px 10px;font:600 11px Outfit">Legit gap</button>
+    <button id="gapLater" style="background:#ba5700;color:#fff;border:0;border-radius:999px;padding:5px 10px;font:600 11px Outfit">Save for later</button>
   </div>
-  <div id="hint" class="out">Test mode: click a start, then a destination. Routes use ONLY green trails + dark-green EV roadways.</div>
+  <div id="drawActions" style="display:none;gap:6px;margin-top:6px">
+    <button id="drawFinish" style="background:#0099ba;color:#fff;border:0;border-radius:999px;padding:5px 10px;font:600 11px Outfit">Finish trail</button>
+    <button id="drawCancel" style="background:#7a929b;color:#fff;border:0;border-radius:999px;padding:5px 10px;font:600 11px Outfit">Cancel</button>
+  </div>
   <button id="export" disabled>Export corrected graph.json</button>
   <div class="stat" id="stat">loading…</div>
   <div class="legend">
-    <span class="pill" style="background:#1f9d55"></span>trail (cart)
-    <span class="pill" style="background:#2e7d32"></span>EV-approved roadway
-    <span class="pill" style="background:#78909c"></span>named road (click to toggle EV when Classify on)
-    <span class="pill" style="background:#d8d8d8"></span>unnamed connector<br/>
-    Distinct hues below = separate connected clusters (gaps).
+    <span class="pill" style="background:#1f9d55"></span>trail <span class="pill" style="background:#2e7d32"></span>EV road
+    <span class="pill" style="background:#78909c"></span>road <span class="pill" style="background:#d8d8d8"></span>unnamed<br/>
+    Distinct hues = separate clusters.
   </div>
 </div>
+<div id="devBadge">DEVELOPER</div>
 <script>
 const GRAPH_URL = new URL("../app/public/data/graph.json", location.href).href;
 const FORBIDDEN = new Set(["preservation trail"]);
@@ -449,6 +468,8 @@ document.getElementById('clrDest').addEventListener('click',()=>{destPt=null;doc
 document.getElementById('gapFix').addEventListener('click',()=>gapAction('fix'));
 document.getElementById('gapLegit').addEventListener('click',()=>gapAction('legit'));
 document.getElementById('gapLater').addEventListener('click',()=>gapAction('later'));
+document.getElementById('tabMap').addEventListener('click',()=>{document.getElementById('panel').style.display='none';document.getElementById('tabMap').classList.add('on');document.getElementById('tabDev').classList.remove('on');});
+document.getElementById('tabDev').addEventListener('click',()=>{document.getElementById('panel').style.display='block';document.getElementById('tabDev').classList.add('on');document.getElementById('tabMap').classList.remove('on');});
 document.getElementById('gapsMode').addEventListener('click',function(){ this.classList.toggle('on');
   gapMode=this.classList.contains('on');
   const lst=document.getElementById('gapsList'); lst.style.display=gapMode?'block':'none';
