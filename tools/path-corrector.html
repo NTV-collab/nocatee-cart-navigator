@@ -55,6 +55,8 @@
   #residentDestInput{max-width:100%}
   #residentRow{width:100%}
 }
+@keyframes logoFadeIn{from{opacity:0;transform:scale(.7)}to{opacity:1;transform:scale(1)}}
+.leaflet-marker-icon.logo-img{animation:logoFadeIn .6s ease}
 </style>
 </head>
 <body>
@@ -80,13 +82,14 @@
   </div>
   <button id="residentStartBtn" style="background:#e6f3f6;border:1px solid #0099ba;color:#00788f;border-radius:999px;padding:5px 10px;font:600 11px Outfit">Set point</button>
   <div style="width:1px;height:28px;background:#dbe3e5"></div>
-  <div style="display:flex;flex-direction:column;font-size:11px;min-width:0;flex:1">
+  <div style="display:flex;flex-direction:column;font-size:11px;min-width:120px;flex:1;position:relative">
     <span style="color:#0099ba;font-weight:600">DESTINATION</span>
     <input id="residentDestInput" list="destPicklist" placeholder="Business or address in Nocatee…" style="border:0;outline:0;background:transparent;color:#00364a;font:700 13px Outfit;width:100%"/>
     <datalist id="destPicklist" style="display:none"></datalist>
     <div id="destAuto" style="display:none;position:absolute;top:100%;left:0;right:0;margin-top:2px;background:#fff;border:1px solid #dbe3e5;border-radius:10px;box-shadow:0 6px 20px rgba(0,54,74,.18);z-index:1300;max-height:230px;overflow:auto"></div>
   </div>
   <button id="residentGo" style="background:#0099ba;color:#fff;border:0;border-radius:999px;padding:6px 14px;font:700 12px Outfit">GO</button>
+  <button id="residentClear" style="background:#fff;color:#ba5700;border:1px solid #ba5700;border-radius:999px;padding:5px 12px;font:600 11px Outfit">Clear route</button>
   </div>
   <div id="residentStatusBar" style="font-size:11px;color:#2e5562;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:none"></div>
 </div>
@@ -829,6 +832,18 @@ function routeResident(start,d){
   }
 }
 document.getElementById('residentGo').addEventListener('click',()=>{ residentGo(); setTimeout(()=>{ if(drivePath&&drivePath.length>1) enterDrive(); }, 400); });
+function residentClearRoute(){
+  clearRoute();
+  if(driveMode) exitDrive();
+  drivePath=null;
+  destPt=null; startPt=null;
+  document.getElementById('residentDestInput').value='';
+  document.getElementById('residentStartVal').textContent='Use my location';
+  destMarker&&map.removeLayer(destMarker); destMarker=null;
+  const rb=document.getElementById('residentStatusBar'); if(rb){rb.style.display='none';}
+  setStatus('Route cleared.');
+}
+document.getElementById('residentClear').addEventListener('click',residentClearRoute);
 document.getElementById('residentStartBtn').addEventListener('click',()=>{armField('start');document.getElementById('residentStartVal').textContent='tap map…';});
 const LOGOS=[
   {name:'spray waterpark', url:'https://d2ol7oe51mr4n9.cloudfront.net/user_3GMMpPAbADd1bMVZfaXlzG5p6dM/dd8c7aa0-2581-4746-a637-f9a83168843b.png', w:56, anchor:[28,52]},
@@ -847,7 +862,7 @@ function addLogos(){
     let p=lg.place;
     if(!p){ const d=(DESTINATIONS||[]).find(x=>x.name.toLowerCase().includes(lg.name)); if(d) p={lat:d.lat,lng:d.lng}; }
     if(!p) return;
-    const ic=L.divIcon({className:'',html:'<img src="'+lg.url+'" alt="" style="width:'+lg.w+'px;height:auto;object-fit:contain;pointer-events:none"/>',iconSize:[lg.w,lg.w],iconAnchor:[lg.anchor[0],lg.anchor[1]]});
+    const ic=L.divIcon({className:'logo-img',html:'<img src="'+lg.url+'" alt="" style="width:'+lg.w+'px;height:auto;object-fit:contain;pointer-events:none"/>',iconSize:[lg.w,lg.w],iconAnchor:[lg.anchor[0],lg.anchor[1]]});
     const m=L.marker([p.lat,p.lng],{icon:ic,interactive:false,zIndexOffset:600}).addTo(map);
     logoSegMarkers.push(m);
   });
