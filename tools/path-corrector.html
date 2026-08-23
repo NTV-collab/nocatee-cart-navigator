@@ -297,8 +297,8 @@ function showRoute(path){
   if(!path)return;
   const ll=path.map(i=>[G.nodes[i*2],G.nodes[i*2+1]]);
   routeLayer=L.layerGroup().addTo(map);
-  L.polyline(ll,{color:"#fff",weight:7,opacity:.9}).addTo(routeLayer);
-  L.polyline(ll,{color:"#d84315",weight:5,opacity:.98}).addTo(routeLayer);
+  L.polyline(ll,{color:"#ffffff",weight:10,opacity:.95,lineJoin:'round'}).addTo(routeLayer);
+  L.polyline(ll,{color:"#0b8fa8",weight:7,opacity:1,lineJoin:'round'}).addTo(routeLayer);
   const aI=path[0],bI=path[path.length-1];
   markA=L.circleMarker([G.nodes[aI*2],G.nodes[aI*2+1]],{radius:8,color:"#fff",fillColor:"#2fae9a",fillOpacity:1}).addTo(routeLayer);
   markB=L.circleMarker([G.nodes[bI*2],G.nodes[bI*2+1]],{radius:8,color:"#fff",fillColor:"#d35f4e",fillOpacity:1}).addTo(routeLayer);
@@ -482,8 +482,8 @@ function enterDrive(){
   updateNextTurn(0);
   updateTripInfo();
   // show the WHOLE route first (overview) so the path is clearly visible; follow kicks in on GPS movement
-  const bounds=L.latLngBounds(drivePath.map(i=>[G.nodes[i*2],G.nodes[i*2+1]]));
-  map.fitBounds(bounds,{padding:[70,70],maxZoom:16});
+  const bounds=L.latLngBounds(drivePath.map(p=>[G.nodes[p*2],G.nodes[p*2+1]]));
+  setTimeout(()=>{ map.fitBounds(bounds,{padding:[70,70],maxZoom:16}); },90); // deferred: iOS Safari blanks overlay if fit runs during transition
   lastFollowT=null;
   ensureWatch();
 }
