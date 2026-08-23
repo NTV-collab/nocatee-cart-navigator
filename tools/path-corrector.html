@@ -349,8 +349,9 @@ function bearingAng(a,b){
 }
 function exitDrive(){
   driveMode=false;
-  document.getElementById('nextTurn').style.display='none';
-  document.getElementById('nextTurnText').textContent='—';
+  document.getElementById('driveUI').style.display='none';
+  document.getElementById('tripBar').style.display='none';
+  const rb=document.getElementById('residentBar'); if(rb) rb.style.display='flex';
   if(watchId!==null){ navigator.geolocation.clearWatch(watchId); watchId=null; }
   if(youMarker){ map.removeLayer(youMarker); youMarker=null; }
 }
@@ -477,12 +478,29 @@ function driveZoom(){ return (window.innerWidth<700)?15.5:16.5; }
 function enterDrive(){
   if(!drivePath){ return; }
   driveMode=true;
-  document.getElementById('nextTurn').style.display='flex';
+  document.getElementById('driveUI').style.display='flex';
+  document.getElementById('tripBar').style.display='flex';
+  const rb=document.getElementById('residentBar'); if(rb) rb.style.display='none';
   updateNextTurn(0);
+  updateTripInfo();
   const s=startPt?[startPt.lat,startPt.lng]:[G.nodes[drivePath[0]*2],G.nodes[drivePath[0]*2+1]];
   map.setView([s[0],s[1]], driveZoom(), {animate:true});
   lastFollowT=[s[0],s[1]];
   ensureWatch();
+}
+function updateTripInfo(){
+  if(!drivePath||drivePath.length<2){ return; }
+  let meters=0;
+  for(let i=1;i<drivePath.length;i++) meters+=hav([G.nodes[drivePath[i-1]*2],G.nodes[drivePath[i-1]*2+1]],[G.nodes[drivePath[i]*2],G.nodes[drivePath[i]*2+1]]);
+  const mins=Math.max(1,Math.round(meters/6.7/60));
+  const h=Math.floor(mins/60), m=mins%60;
+  const now=new Date(); const eta=new Date(now.getTime()+mins*60000);
+  const eH=eta.getHours(), eM=eta.getMinutes();
+  const curH=now.getHours(), curM=now.getMinutes();
+  let dur=h?h+':'+String(m).padStart(2,'0')+' h':mins+' min';
+  document.getElementById('tripEta').textContent=eH+':'+String(eM).padStart(2,'0');
+  document.getElementById('tripMeta').textContent=(meters<1000?Math.round(meters)+' m':(meters/1000).toFixed(1)+' km')+' · '+dur;
+  const dest=document.getElementById('residentDestInput'); if(dest&&dest.value){ document.getElementById('tripMeta').textContent+=' · '+dest.value; }
 }
 function updateNextTurn(offset){
   const path=drivePath; if(!path||path.length<2){ document.getElementById('nextTurnText').textContent='Arrive'; return; }
@@ -497,11 +515,16 @@ function updateNextTurn(offset){
   document.getElementById('nextTurnArrow').textContent=arrow;
   let nm=edgeNameOf(p1,p2);
   if(nm==='(unnamed)') nm='the path';
-  document.getElementById('nextTurnText').textContent=turn+' onto '+nm;
-  // distance to that turn (m)
+  document.getElementById('nextTurnText').textContent=nm;
   let d=0;
   for(let k=offset||0;k<t;k++){ d+=hav([G.nodes[drivePath[k]*2],G.nodes[drivePath[k]*2+1]],[G.nodes[drivePath[k+1]*2],G.nodes[drivePath[k+1]*2+1]]); }
-  document.getElementById('nextTurnDist').textContent=Math.round(d)+' m';
+  const ft=Math.round(d*3.28084);
+  document.getElementById('nextTurnDist').textContent=ft>1000?(ft/5280).toFixed(1)+' mi':ft+' ft';
+  const sub=document.getElementById('nextTurnSub');
+  if(sub) sub.textContent=turn+((nm==='the path')?'':' onto '+nm);
+  const sr=document.getElementById('turnSubRow');
+  if(sr){ sr.style.display='flex'; document.getElementById('nextTurnSubArrow').textContent=arrow; }
+  updateTripInfo();
 }
 function firstTurnIndex(path, off){
   for(let k=Math.max(1,(off||0)+1); k<path.length-1; k++){
