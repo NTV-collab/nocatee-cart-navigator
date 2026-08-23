@@ -42,6 +42,20 @@
     <button id="mDraw">Draw trail</button>
     <button id="mRemove">Remove</button>
   </div>
+  <div id="routeFields" style="margin:8px 0;font-size:12px;display:flex;flex-direction:column;gap:4px">
+    <div style="display:flex;gap:4px;align-items:center">
+      <span style="flex:1;color:#ccc">Starting:</span>
+      <span id="startLabel" style="color:#aaa">—</span>
+      <button id="setStart" style="background:#2e7d32;color:#fff;border:0;border-radius:4px;padding:2px 8px;font-size:11px">Set</button>
+      <button id="clrStart" style="background:#444;color:#fff;border:0;border-radius:4px;padding:2px 6px;font-size:10px" title="clear">✕</button>
+    </div>
+    <div style="display:flex;gap:4px;align-items:center">
+      <span style="flex:1;color:#ccc">Destination:</span>
+      <span id="destLabel" style="color:#aaa">—</span>
+      <button id="setDest" style="background:#d33f4e;color:#fff;border:0;border-radius:4px;padding:2px 8px;font-size:11px">Set</button>
+      <button id="clrDest" style="background:#444;color:#fff;border:0;border-radius:4px;padding:2px 6px;font-size:10px" title="clear">✕</button>
+    </div>
+  </div>
   <label class="tgl"><input type="checkbox" id="showOthers" checked> show non-cart roads (gray/blue backdrop)</label>
   <label class="tgl"><input type="checkbox" id="classifyMode"> classify: click a road to (un)EV-approve it → reconnects live</label>
   <div class="mode" style="margin-top:8px"><button id="gapsMode">Gaps: show &amp; fix</button></div>
@@ -81,6 +95,7 @@ L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",{at
 
 let network=null, routeLayer=null, pickA=null, pickB=null, markA=null, markB=null, snapPreview=null;
 let mode="test", selNode=null, fixes={}, lastStart=null, evSet=new Set();
+let pickTarget=null, startPt=null, destPt=null, fieldArmed=null;
 const msg=document.getElementById("hint"), stat=document.getElementById("stat");
 const fixBtn=document.getElementById("mFix"), testBtn=document.getElementById("mTest");
 const exportBtn=document.getElementById("export"), showOthersCb=document.getElementById("showOthers");
@@ -205,6 +220,22 @@ function showRoute(path){
   msg.textContent="ROUTE · "+Math.round(meters)+" m · "+path.length+" hops\n"+dirs.join("  >>  ");
 }
 
+function runRoute(){
+  if(!startPt||!destPt){return;}
+  const A=cartNearest(startPt.lat,startPt.lng), B=cartNearest(destPt.lat,destPt.lng);
+  if(A.idx<0||B.idx<0){msg.textContent="No cart-network nearby the "+((A.idx<0)?"start":"destination")+" — you're in a gap.";clearRoute();return;}
+  if(compOf[A.idx]!==compOf[B.idx]){
+    msg.textContent="DIFFERENT clusters (#"+(compOf[A.idx]+1)+" vs #"+(compOf[B.idx]+1)+" of "+nComp+") — no cart route connects them (network gap).";
+    showRoute(null);return;
+  }
+  const adj=buildCartAdj();const r=dijkstraCart(A.idx,B.idx,adj);
+  if(!r){msg.textContent="No cart route within the cluster — gap.";showRoute(null);}
+  else showRoute(r.path);
+}
+function armField(which){
+  fieldArmed=which;
+  msg.textContent="Set "+which+": click a spot on the map.";
+}
 map.on("click",e=>{
   if(classifyCb.checked)return; // road-click toggles are handled on road layers
   if(mode==="remove"){
@@ -243,18 +274,19 @@ map.on("click",e=>{
     return;
   }
   if(mode==="test"){
-    if(!lastStart){lastStart=e.latlng; if(pickA)map.removeLayer(pickA); pickA=L.circleMarker([e.latlng.lat,e.latlng.lng],{radius:7,color:"#fff",weight:2,fillColor:"#2fae9a",fillOpacity:1}).addTo(map); stat.textContent="start set — choose destination"; return;}
-    if(pickB)map.removeLayer(pickB); pickB=L.circleMarker([e.latlng.lat,e.latlng.lng],{radius:7,color:"#fff",weight:2,fillColor:"#d33f4e",fillOpacity:1}).addTo(map);
-    const A=cartNearest(lastStart.lat,lastStart.lng), B=cartNearest(e.latlng.lat,e.latlng.lng);
-    if(A.idx<0||B.idx<0){msg.textContent="No cart-network nearby — you're in a gap.";clearRoute();lastStart=null;return;}
-    if(compOf[A.idx]!==compOf[B.idx]){
-      msg.textContent="DIFFERENT clusters (#"+(compOf[A.idx]+1)+" vs #"+(compOf[B.idx]+1)+" of "+nComp+") — no cart route connects them (network gap).";
-      showRoute(null);lastStart=null;return;
+    // explicit field wiring: a click arms the pending active field
+    if(fieldArmed){
+      const el=document.getElementById(fieldArmed+'Label');
+      el.textContent=e.latlng.lat.toFixed(5)+', '+e.latlng.lng.toFixed(5);
+      if(fieldArmed==='start'){startPt={lat:e.latlng.lat,lng:e.latlng.lng}; if(pickA)map.removeLayer(pickA); pickA=L.circleMarker([e.latlng.lat,e.latlng.lng],{radius:7,color:"#fff",weight:2,fillColor:"#2fae9a",fillOpacity:1}).addTo(map);}
+      else {destPt={lat:e.latlng.lat,lng:e.latlng.lng}; if(pickB)map.removeLayer(pickB); pickB=L.circleMarker([e.latlng.lat,e.latlng.lng],{radius:7,color:"#fff",weight:2,fillColor:"#d33f4e",fillOpacity:1}).addTo(map);}
+      fieldArmed=null;
+      if(startPt&&destPt){ runRoute(); }
+      return;
     }
-    const adj=buildCartAdj();const r=dijkstraCart(A.idx,B.idx,adj);
-    if(!r){msg.textContent="No cart route within the cluster — gap.";showRoute(null);}
-    else showRoute(r.path);
-    lastStart=null;
+    // legacy two-click fallback (harmless)
+    if(!startPt&&!destPt&&!lastStart){lastStart=e.latlng; if(pickA)map.removeLayer(pickA); pickA=L.circleMarker([e.latlng.lat,e.latlng.lng],{radius:7,color:"#fff",weight:2,fillColor:"#2fae9a",fillOpacity:1}).addTo(map); stat.textContent="start set — choose destination"; return;}
+    if(!destPt&&!lastStart){destPt=null;}
   }else{
     if(selNode===null){const g=cartNearest(e.latlng.lat,e.latlng.lng);
       if(g.idx<0||g.d>60){msg.textContent="no cart-network point within 60 m here.";return;}
@@ -271,7 +303,7 @@ map.on("mousemove",e=>{if(mode!=="fix"||selNode===null)return;const s=snapPointT
 const clearPreview=()=>{if(snapPreview){map.removeLayer(snapPreview);snapPreview=null;}};
 map.on("dblclick",e=>{ if(mode==="draw"){ e.originalEvent.preventDefault(); endDraw(); } });
 fixBtn.onclick=()=>{mode="fix";fixBtn.classList.add("on");testBtn.classList.remove("on");drawBtn.classList.remove("on");removeBtn.classList.remove("on");selNode=null;clearPreview();clearRoute();msg.textContent="Fix mode: click a cart point, then click where it should land (snaps to nearest line).";};
-testBtn.onclick=()=>{mode="test";testBtn.classList.add("on");fixBtn.classList.remove("on");drawBtn.classList.remove("on");removeBtn.classList.remove("on");lastStart=null;clearPreview();clearRoute();msg.textContent="Test mode: click start, then destination.";};
+testBtn.onclick=()=>{mode="test";testBtn.classList.add("on");fixBtn.classList.remove("on");drawBtn.classList.remove("on");removeBtn.classList.remove("on");lastStart=null;fieldArmed=null;clearPreview();clearRoute();msg.textContent="Test mode: set Starting, set Destination (click a field, then click the map), route auto-computes.";};
 const removeBtn=document.getElementById("mRemove");
 let removedNames=new Set(); let removedEdges=new Set();
 removeBtn.onclick=()=>{mode="remove";removeBtn.classList.add("on");testBtn.classList.remove("on");fixBtn.classList.remove("on");drawBtn.classList.remove("on");clearPreview();clearRoute();msg.textContent="Remove mode: click a ROAD or TRAIL line to remove it from the cart network. Click again to undo.";};
@@ -410,6 +442,10 @@ function gapAction(action){
   exportBtn.disabled=false;
   renderGapsList(); drawGapMarkers();
 }
+document.getElementById('setStart').addEventListener('click',()=>armField('start'));
+document.getElementById('setDest').addEventListener('click',()=>armField('dest'));
+document.getElementById('clrStart').addEventListener('click',()=>{startPt=null;document.getElementById('startLabel').textContent='—';fieldArmed=null;if(pickA){map.removeLayer(pickA);pickA=null;}clearRoute();});
+document.getElementById('clrDest').addEventListener('click',()=>{destPt=null;document.getElementById('destLabel').textContent='—';fieldArmed=null;if(pickB){map.removeLayer(pickB);pickB=null;}clearRoute();});
 document.getElementById('gapFix').addEventListener('click',()=>gapAction('fix'));
 document.getElementById('gapLegit').addEventListener('click',()=>gapAction('legit'));
 document.getElementById('gapLater').addEventListener('click',()=>gapAction('later'));
