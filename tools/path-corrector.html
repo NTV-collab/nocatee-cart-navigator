@@ -77,7 +77,11 @@
 <div id="residentBar" style="display:flex;position:fixed;top:66px;left:50%;transform:translateX(-50%);z-index:1100;background:#fff;border:1px solid #dbe3e5;border-radius:18px;box-shadow:0 4px 16px rgba(0,54,74,.16);padding:10px 12px;flex-direction:row;gap:8px;align-items:center;max-width:min(600px,94vw);width:max-content">
   <div class="rrow" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
   <div style="display:flex;flex-direction:column;font-size:11px;min-width:120px;flex:1;position:relative">
-    <span style="color:#00788f;font-weight:700;font-size:11px;letter-spacing:.4px">WHERE TO?</span>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <span style="color:#00788f;font-weight:700;font-size:11px;letter-spacing:.4px">WHERE TO?</span>
+      <a href="#" id="startLink" style="color:#0099ba;font-size:10px;font-weight:600;text-decoration:underline;cursor:pointer">Set starting point</a>
+      <span id="startPtLabel" style="font-size:10px;color:#2e5562;display:none;white-space:nowrap"></span>
+    </div>
     <input id="residentDestInput" list="destPicklist" placeholder="Business or address in Nocatee…" style="border:0;outline:0;background:transparent;color:#00364a;font:700 13px Outfit;width:100%"/>
     <datalist id="destPicklist" style="display:none"></datalist>
     <div id="destAuto" style="display:none;position:absolute;top:100%;left:0;right:0;margin-top:2px;background:#fff;border:1px solid #dbe3e5;border-radius:10px;box-shadow:0 6px 20px rgba(0,54,74,.18);z-index:1300;max-height:230px;overflow:auto"></div>
@@ -591,7 +595,9 @@ map.on("click",e=>{
     if(fieldArmed){
       const el=document.getElementById(fieldArmed+'Label');
       el.textContent=e.latlng.lat.toFixed(5)+', '+e.latlng.lng.toFixed(5);
-      if(fieldArmed==='start'){startPt={lat:e.latlng.lat,lng:e.latlng.lng}; if(pickA)map.removeLayer(pickA); pickA=L.circleMarker([e.latlng.lat,e.latlng.lng],{radius:7,color:"#fff",weight:2,fillColor:"#2fae9a",fillOpacity:1}).addTo(map);}
+      if(fieldArmed==='start'){startPt={lat:e.latlng.lat,lng:e.latlng.lng}; if(pickA)map.removeLayer(pickA); pickA=L.circleMarker([e.latlng.lat,e.latlng.lng],{radius:7,color:"#fff",weight:2,fillColor:"#2fae9a",fillOpacity:1}).addTo(map);
+        const ls=document.getElementById('startPtLabel'); if(ls){ ls.textContent='From '+e.latlng.lat.toFixed(4)+', '+e.latlng.lng.toFixed(4); ls.style.display='inline'; }
+        const lk=document.getElementById('startLink'); if(lk) lk.textContent='Change';}
       else {destPt={lat:e.latlng.lat,lng:e.latlng.lng}; if(pickB)map.removeLayer(pickB); pickB=L.circleMarker([e.latlng.lat,e.latlng.lng],{radius:7,color:"#fff",weight:2,fillColor:"#d33f4e",fillOpacity:1}).addTo(map);}
       fieldArmed=null;
       if(startPt&&destPt){ runRoute(); }
@@ -756,6 +762,7 @@ function gapAction(action){
   renderGapsList(); drawGapMarkers();
 }
 document.getElementById('setStart').addEventListener('click',()=>armField('start'));
+document.getElementById('startLink').addEventListener('click',(e)=>{ e.preventDefault(); armField('start'); setStatus('Tap the map to set your starting point.'); });
 document.getElementById('setDest').addEventListener('click',()=>armField('dest'));
 document.getElementById('clrStart').addEventListener('click',()=>{startPt=null;document.getElementById('startLabel').textContent='—';fieldArmed=null;if(pickA){map.removeLayer(pickA);pickA=null;}clearRoute();});
 document.getElementById('clrDest').addEventListener('click',()=>{destPt=null;document.getElementById('destLabel').textContent='—';fieldArmed=null;if(pickB){map.removeLayer(pickB);pickB=null;}clearRoute();});
