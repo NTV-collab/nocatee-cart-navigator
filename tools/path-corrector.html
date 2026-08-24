@@ -914,7 +914,7 @@ document.getElementById('residentGo').addEventListener('click',()=>{
     if(!ok){ dbg('No network data — cannot route.'); return; }
     dbg('graph ok ('+G.nodes.length/2+' nodes) · routing…');
     residentGo();
-    setTimeout(()=>{ if(drivePath&&drivePath.length>1){ enterDrive(); dbgClear(); setTimeout(()=>{ if(drivePath&&drivePath.length>1){ try{ map.fitBounds(drivePath.map(p=>[G.nodes[p*2],G.nodes[p*2+1]]),{padding:[70,70],maxZoom:16}); }catch(e){} dbgClear(); } },250); } else { dbg('GO: no route produced · check start/dest', true); } }, 400);
+    setTimeout(()=>{ if(drivePath&&drivePath.length>1){ enterDrive(); dbgClear(); setTimeout(()=>{ if(drivePath&&drivePath.length>1){ try{ map.fitBounds(drivePath.map(p=>[G.nodes[p*2],G.nodes[p*2+1]]),{padding:[40,40],maxZoom:13}); }catch(e){} dbgClear(); } },250); } else { dbg('GO: no route produced · check start/dest', true); } }, 400);
   });
 });
 function recenterOnMe(){
