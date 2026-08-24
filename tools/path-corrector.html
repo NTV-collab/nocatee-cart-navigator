@@ -313,7 +313,7 @@ function showRoute(path){
 let driveMode=false, drivePath=null;
 function residentPreviewRoute(d){
   if(driveMode) exitDrive();
-  const startIdx=startPt?cartNearest(startPt.lat,startPt.lng).idx:cartNearest(map.getCenter().lat,map.getCenter().lng).idx;
+  const startIdx=startPt?cartNearest(startPt.lat,startPt.lng).idx:cartNearest(startAnchorPt().lat,startAnchorPt().lng).idx;
   const destIdx=cartNearest(d.lat,d.lng).idx;
   if(startIdx<0||destIdx<0){ setStatus('No cart network near "'+d.name+'".'); return; }
   if(compOf[startIdx]!==compOf[destIdx]){ setStatus('No cart route from here to "'+d.name+'" (different clusters).'); showRoute(null); return; }
@@ -815,7 +815,7 @@ function geocodeGoogle(q){
 }
 let destMarker=null;
 function routeToPoint(dp){
-  const startIdx=startPt?cartNearest(startPt.lat,startPt.lng).idx:cartNearest(map.getCenter().lat,map.getCenter().lng).idx;
+  const startIdx=startPt?cartNearest(startPt.lat,startPt.lng).idx:cartNearest(startAnchorPt().lat,startAnchorPt().lng).idx;
   const destIdx=cartNearest(dp.lat,dp.lng).idx;
   if(startIdx<0||destIdx<0){ setStatus('No cart network near that spot.'); return; }
   if(compOf[startIdx]!==compOf[destIdx]){ setStatus('No cart route from here to there (different network clusters).'); showRoute(null); return; }
@@ -823,6 +823,7 @@ function routeToPoint(dp){
   if(!r){ setStatus('No cart route to that spot.'); showRoute(null); }
   else { showRoute(r.path); drivePath=r.path; map.fitBounds(r.path.map(i=>[G.nodes[i*2],G.nodes[i*2+1]]),{padding:[60,60]}); setStatus('Route: '+Math.round(r.dist)+' m · tap GO to drive.'); }
 }
+function startAnchorPt(){ return {lat:30.1096,lng:-81.4179}; }
 function residentGo(){
   const inp=document.getElementById('residentDestInput');
   const val=(inp.value||'').trim();
@@ -840,7 +841,7 @@ function residentGo(){
     });
     return;
   }
-  if(!d){msg.textContent='Type a destination (or pick one from the list).';return;}
+  if(!d){setStatus('Type a destination (or pick one from the list).');return;}
   // use startPt if user set one, else geolocation if available, else map center
   if(!startPt){
     if(navigator.geolocation){
@@ -851,7 +852,7 @@ function residentGo(){
       },()=>routeResident(null,d),{timeout:6000,maximumAge:30000});
       return;
     }
-    routeResident(null,d);
+    routeResident(startAnchorPt(),d);
   } else {
     routeResident(startPt,d);
   }
@@ -867,7 +868,7 @@ function routeResident(start,d){
   if(startIdx<0||destIdx<0){ setStatus('No cart network near that destination.'); return; }
   if(compOf[startIdx]!==compOf[destIdx]){ setStatus('No cart route from here to "'+d.name+'" (different network clusters).'); showRoute(null); return; }
   const adj=buildCartAdj(); const r=dijkstraCart(startIdx,destIdx,adj);
-  if(!r){ msg.textContent='No cart route to "'+d.name+'".'; showRoute(null); }
+  if(!r){ setStatus('No cart route to "'+d.name+'".'); showRoute(null); }
   else {
     showRoute(r.path);
     drivePath=r.path;
