@@ -106,6 +106,7 @@
     <div><span>Starting:</span><span class="val" id="startLabel">—</span><button id="setStart">Set</button><button id="clrStart">✕</button></div>
     <div><span>Destination:</span><span class="val" id="destLabel">—</span><button id="setDest">Set</button><button id="clrDest">✕</button></div>
   </div>
+  <label class="tgl"><input type="checkbox" id="netToggle" checked> show network</label>
   <label class="tgl"><input type="checkbox" id="showOthers" checked> show non-cart roads</label>
   <label class="tgl"><input type="checkbox" id="classifyMode"> classify: click a road to (un)EV-approve it</label>
   <div class="mode" style="margin-top:8px"><button id="gapsMode">Gaps: show &amp; fix</button></div>
@@ -214,6 +215,9 @@ function setStatus(t){
 const fixBtn=document.getElementById("mFix"), testBtn=document.getElementById("mTest");
 const exportBtn=document.getElementById("export"), showOthersCb=document.getElementById("showOthers");
 const classifyCb=document.getElementById("classifyMode");
+const netToggleCb=document.getElementById("netToggle");
+let netVisible=true;
+netToggleCb&&netToggleCb.addEventListener('change',()=>{ netVisible=netToggleCb.checked; if(!G) return; if(netVisible){ try{ensureNetwork();}catch(e){} } else if(network){ try{map.removeLayer(network);}catch(e){} } });
 const panelEl=document.getElementById("panel");
 btnHide.addEventListener("click",e=>{e.stopPropagation();panelEl.classList.toggle("collapsed");btnHide.textContent=panelEl.classList.contains("collapsed")?"+":"–";});
 panelEl.addEventListener("click",e=>{ if(panelEl.classList.contains("collapsed")&&!e.target.closest("button")){panelEl.classList.remove("collapsed");btnHide.textContent="–";} });
@@ -257,6 +261,7 @@ function evStats(){
   stat.textContent="clusters: "+multi+" · biggest "+big+" nodes · EV roads: "+(EV_NAMES.size+evSet.size)+" (+"+evSet.size+" user)";
 }
 function drawNetwork(){
+  if(typeof netVisible!=='undefined' && !netVisible) return;
   if(network){map.removeLayer(network);}
   network=L.layerGroup().addTo(map);
   const showOthers=showOthersCb.checked;
@@ -630,16 +635,16 @@ map.on("click",e=>{
       const dx=e.latlng.lng*cosv-(ax+abx*t),dy=e.latlng.lat-(ay+aby*t),d=dx*dx+dy*dy;
       if(d<bd){bd=d;best=i;}
     }
-    if(best===null){msg.textContent="No cart line nearby to remove.";return;}
+    if(best===null){setStatus("No cart line nearby to remove.");return;}
     const ni=G.edgesNameIdx[best];
     const nm=ni>=0?G.names[ni]:"";
     if(nm){
-      if(removedNames.has(nm)){removedNames.delete(nm);msg.textContent="Restored: "+nm;}
-      else{removedNames.add(nm);msg.textContent="REMOVED: "+nm+" — click again to restore.";}
+      if(removedNames.has(nm)){removedNames.delete(nm);setStatus("Restored: "+nm);}
+      else{removedNames.add(nm);setStatus("REMOVED: "+nm+" — click again to restore.");}
     } else {
       const key=best;
-      if(removedEdges.has(key)){removedEdges.delete(key);msg.textContent="Restored unnamed segment #"+best;}
-      else{removedEdges.add(key);msg.textContent="REMOVED unnamed segment (edge #"+best+") — click again to restore.";}
+      if(removedEdges.has(key)){removedEdges.delete(key);setStatus("Restored unnamed segment #"+best);}
+      else{removedEdges.add(key);setStatus("REMOVED unnamed segment (edge #"+best+") — click again to restore.");}
     }
     exportBtn.disabled=false;
     ensureNetwork();
@@ -1052,7 +1057,7 @@ function enterDev(){
   document.getElementById('tabDev').classList.add('on');
   document.getElementById('tabMap').classList.remove('on');
   // ensure graph is loaded, then draw the network in dev view
-  if(G&&G.nodes&&G.nodes.length){ try{ ensureNetwork(); }catch(e){} return; }
+  if(G&&G.nodes&&G.nodes.length){ if(netVisible!==false){ try{ ensureNetwork(); }catch(e){} } return; }
   const abs=new URL('../app/public/data/graph.json', location.href).href;
   fetch(abs).then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); }).then(j=>{
     G=j;
