@@ -173,6 +173,10 @@ const ADDRESSES = [{"label": "10440 US Highway 1 North, Suite 115", "lat": 30.07
 const GRAPH_URL = new URL("../app/public/data/graph.json", location.href).href;
 const FORBIDDEN = new Set(["preservation trail"]);
 
+setTimeout(function(){ try{ const b=document.getElementById('drawFinish'); if(b && !b._wired){ b._wired=true; b.addEventListener('click',function(){ try{ if(typeof endDraw==='function') endDraw(); else setStatus('Finish: draw points first.'); }catch(e){ setStatus('Finish error: '+e.message); } }); } }catch(e){} }, 600);
+window.__drawWire=true;
+
+
 /* ---- early, defensive tab wiring: Developer/Map must ALWAYS work ---- */
 (function(){ 
   function bindTabs(){
@@ -655,7 +659,7 @@ map.on("click",e=>{
     if(drawPoly)map.removeLayer(drawPoly);
     drawPoly=L.polyline(drawPts,{color:"#ff9800",weight:4,opacity:.95}).addTo(map);
     document.getElementById("drawActions").style.display="flex";
-    msg.textContent="Drawing… "+drawPts.length+" points — Finish when done.";
+    setStatus("Drawing… "+drawPts.length+" points — Finish when done.");
     return;
   }
   if(mode==="test"){
@@ -696,7 +700,7 @@ let removedNames=new Set(); let removedEdges=new Set();
 removeBtn.onclick=()=>{mode="remove";removeBtn.classList.add("on");testBtn.classList.remove("on");fixBtn.classList.remove("on");drawBtn.classList.remove("on");clearPreview();clearRoute();msg.textContent="Remove mode: click a ROAD or TRAIL line to remove it from the cart network. Click again to undo.";};
 const drawBtn=document.getElementById("mDraw");
 let drawPts=[], drawPoly=null;
-drawBtn.onclick=()=>{mode="draw";drawBtn.classList.add("on");testBtn.classList.remove("on");fixBtn.classList.remove("on");drawPts=[];clearPreview();clearRoute();msg.textContent="Draw mode: click points to trace a new trail; double-click or tap the last point to finish. Start/end snap to the network.";};
+drawBtn.onclick=()=>{mode="draw";drawBtn.classList.add("on");testBtn.classList.remove("on");fixBtn.classList.remove("on");drawPts=[];clearPreview();clearRoute();setStatus("Draw mode: click points to trace a new trail; tap Finish when done. Start/end snap to the network.");};
 function endDraw(){
   if(drawPts.length>=2){
     // snap first & last onto existing graph line (so it connects)
@@ -723,13 +727,13 @@ function endDraw(){
     bridge(ids[0],[drawPts[0][0],drawPts[0][1]]);
     bridge(ids[ids.length-1],[drawPts[drawPts.length-1][0],drawPts[drawPts.length-1][1]]);
     exportBtn.disabled=false;
-    msg.textContent="Drew a new trail ("+ids.length+" points, "+(ids.length-1)+" segments) → exported/on network. Continue or Export.";
+    setStatus("Drew a new trail ("+ids.length+" points, "+(ids.length-1)+" segments) — on network. Continue or Export.");
     ensureNetwork();
-  } else { msg.textContent="Need at least 2 clicks to draw a trail."; }
+  } else { setStatus("Need at least 2 clicks to draw a trail — click the map first."); }
   drawPoly=null; drawPts=[]; document.getElementById("drawActions").style.display="none";
 }
 document.getElementById("drawFinish").addEventListener("click",endDraw);
-document.getElementById("drawCancel").addEventListener("click",()=>{drawPts=[];if(drawPoly){map.removeLayer(drawPoly);drawPoly=null;}document.getElementById("drawActions").style.display="none";msg.textContent="Draw cancelled.";});
+document.getElementById("drawCancel").addEventListener("click",()=>{drawPts=[];if(drawPoly){map.removeLayer(drawPoly);drawPoly=null;}document.getElementById("drawActions").style.display="none";setStatus("Draw cancelled.");});
 showOthersCb.onchange=()=>{if(G)drawNetwork();};
 classifyCb.onchange=()=>{if(G){ensureNetwork();msg.textContent=classifyCb.checked?"Classify mode ON: click roads (blue-gray) to mark/unmark EV-approved.":"Classify mode off.";}};
 exportBtn.onclick=()=>{
