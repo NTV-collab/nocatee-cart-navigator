@@ -552,7 +552,12 @@ function runRoute(){
   if(!r){msg.textContent="No cart route within the cluster — gap.";showRoute(null);}
   else showRoute(r.path);
 }
-function dbg(msg){ const el=document.getElementById('dbgLine'); if(el){ el.textContent=msg; el.style.display='block'; } }
+function dbg(msg){
+  const el=document.getElementById('dbgLine'); if(el){ el.textContent=msg; el.style.display='block'; }
+  let t=document.getElementById('dbgToast');
+  if(!t){ t=document.createElement('div'); t.id='dbgToast'; t.style.cssText='position:fixed;bottom:120px;left:50%;transform:translateX(-50%);z-index:3000;background:#111;color:#fff;font:600 12px Outfit;padding:8px 14px;border-radius:999px;box-shadow:0 4px 14px rgba(0,0,0,.4);max-width:92vw'; document.body.appendChild(t); }
+  t.textContent=msg; clearTimeout(t._h); t._h=setTimeout(()=>{t.remove();},6000);
+}
 function dbgGraph(){ dbg('graph: '+(G&&G.nodes? (G.nodes.length/2)+' nodes':'NOT LOADED')+' · route: '+(drivePath&&drivePath.length? (drivePath.length-1)+' hops':'none')); }
 function armField(which){
   fieldArmed=which;
@@ -880,7 +885,21 @@ function routeResident(start,d){
     setStatus('Route to '+d.name+': '+Math.round(r.dist)+'m · tap GO to drive.');
   }
 }
-document.getElementById('residentGo').addEventListener('click',()=>{ dbg('GO tapped · graph: '+(G&&G.nodes?'ok':'null')); residentGo(); setTimeout(()=>{ if(drivePath&&drivePath.length>1){ enterDrive(); dbgGraph(); setTimeout(()=>{ if(drivePath&&drivePath.length>1){ try{ map.fitBounds(drivePath.map(p=>[G.nodes[p*2],G.nodes[p*2+1]]),{padding:[70,70],maxZoom:16}); }catch(e){} dbgGraph(); } },250); } else { dbg('GO: no drivePath (route failed) · graph: '+(G&&G.nodes?'ok':'null')); } }, 400); });
+function ensureGraphLoaded(){
+  if(G&&G.nodes&&G.nodes.length) return Promise.resolve(true);
+  const abs=new URL('../app/public/data/graph.json', location.href).href;
+  dbg('Loading network data…');
+  return fetch(abs).then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); }).then(j=>{ G=j; try{ computeComponents(); }catch(e){} try{ ensureNetwork(); }catch(e){} return true; }).catch(e=>{ dbg('Graph load failed: '+e.message); return false; });
+}
+document.getElementById('residentGo').addEventListener('click',()=>{
+  dbg('GO tapped · graph: '+(G&&G.nodes?'ok':'null')+' → loading if needed');
+  ensureGraphLoaded().then(ok=>{
+    if(!ok){ dbg('No network data — cannot route.'); return; }
+    dbg('graph ok ('+G.nodes.length/2+' nodes) · routing…');
+    residentGo();
+    setTimeout(()=>{ if(drivePath&&drivePath.length>1){ enterDrive(); dbgGraph(); setTimeout(()=>{ if(drivePath&&drivePath.length>1){ try{ map.fitBounds(drivePath.map(p=>[G.nodes[p*2],G.nodes[p*2+1]]),{padding:[70,70],maxZoom:16}); }catch(e){} dbgGraph(); } },250); } else { dbg('GO: no route produced · graph ok, check start/dest'); } }, 400);
+  });
+});
 function recenterOnMe(){
   if(navigator.geolocation){
     navigator.geolocation.getCurrentPosition(pos=>{
