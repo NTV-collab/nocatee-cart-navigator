@@ -991,6 +991,12 @@ fetch(EV_URL).then(r=>r.ok?r.json():[]).then(arr=>{arr.forEach(x=>EV_NAMES.add(S
   }).catch(e=>{stat.textContent="ERROR: "+e.message;setStatus("Graph failed to load.");});
   // default to the resident Map view on load
   setTimeout(()=>{ enterResident(); }, 300);
+  // Robust graph loader fallback: if the chained fetch never set G, load directly
+  setTimeout(()=>{
+    if(G&&G.nodes&&G.nodes.length) return;
+    const abs=new URL('../app/public/data/graph.json', location.href).href;
+    fetch(abs).then(r=>r.json()).then(j=>{ G=j; try{ computeComponents(); }catch(e){} try{ ensureNetwork(); }catch(e){} try{ enterResident(); }catch(e){} }).catch(e=>{ try{setStatus('Could not load network data.');}catch(_){} });
+  }, 2500);
 </script>
 </body>
 </html>
