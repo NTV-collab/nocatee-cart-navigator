@@ -156,10 +156,13 @@
     <span style="background:rgba(255,255,255,.92);color:#00364a;font-weight:600;font-size:12px;border-radius:8px;padding:3px 9px" id="nextTurnSubArrow">→</span>
   </div>
 </div>
-<div id="tripBar" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:1100;background:rgba(255,255,255,.96);border-top:1px solid #dbe3e5;padding:10px 16px 22px;align-items:center;gap:12px;box-shadow:0 -4px 16px rgba(0,54,74,.10)">
+<div id="tripBar" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:1100;background:rgba(255,255,255,.97);border-top:1px solid #dbe3e5;padding:12px 18px calc(16px + env(safe-area-inset-bottom));align-items:center;gap:12px;box-shadow:0 -4px 16px rgba(0,54,74,.10)">
   <div style="flex:1">
-    <div id="tripEta" style="font:800 24px Outfit;color:#00364a;line-height:1">—</div>
-    <div id="tripMeta" style="font-size:12px;color:#7a929b">—</div>
+    <div style="display:flex;gap:8px;align-items:baseline">
+      <div id="tripEta" style="font:800 22px Outfit;color:#00364a;line-height:1">—</div>
+      <div style="font-size:11px;color:#7a929b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="tripDest">—</div>
+    </div>
+    <div id="tripMeta" style="font-size:11px;color:#7a929b">—</div>
   </div>
   <button id="tripDone" style="background:#ba5700;color:#fff;border:0;border-radius:999px;padding:9px 16px;font:700 12px Outfit">End</button>
 </div>
@@ -501,7 +504,11 @@ function updateTripInfo(){
   let dur=h?h+':'+String(m).padStart(2,'0')+' h':mins+' min';
   document.getElementById('tripEta').textContent=eH+':'+String(eM).padStart(2,'0');
   document.getElementById('tripMeta').textContent=(meters<1000?Math.round(meters)+' m':(meters/1000).toFixed(1)+' km')+' · '+dur;
-  const dest=document.getElementById('residentDestInput'); if(dest&&dest.value){ document.getElementById('tripMeta').textContent+=' · '+dest.value; }
+  const dest=document.getElementById('residentDestInput');
+  const tripDest=document.getElementById('tripDest');
+  if(tripDest) tripDest.textContent=dest&&dest.value?('to '+dest.value):'';
+  const tm=document.getElementById('tripMeta');
+  if(tm) tm.textContent=(meters<1000?Math.round(meters)+' m':(meters/1000).toFixed(1)+' km')+' · '+mins+' min'+(dest&&dest.value?' · '+dest.value:'');
 }
 function updateNextTurn(offset){
   const path=drivePath; if(!path||path.length<2){ document.getElementById('nextTurnText').textContent='Arrive'; return; }
