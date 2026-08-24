@@ -270,7 +270,7 @@ function drawNetwork(){
     });
   });
 }
-function ensureNetwork(){computeComponents();drawNetwork();evStats();}
+function ensureNetwork(){ if(document.getElementById('residentBar') && document.getElementById('residentBar').style.display==='flex'){ computeComponents(); /* hidden in resident */ } else { computeComponents(); drawNetwork(); evStats(); } }
 
 function cartNearest(lat,lng){
   let b=-1,bd=1e18;
@@ -895,8 +895,10 @@ function routeResident(start,d){
   const destPt={lat:d.lat,lng:d.lng};
   let startIdx=-1, destIdx=-1;
   if(startPt){ startIdx=cartNearest(startPt.lat,startPt.lng).idx; }
-  else { // fallback: center of map as start
-    const c=map.getCenter(); startIdx=cartNearest(c.lat,c.lng).idx; }
+  else { // fallback: Welcome Center anchor (visible, real place) instead of random map center
+    const a=startAnchorPt(); startIdx=cartNearest(a.lat,a.lng).idx;
+    const ls=document.getElementById('startPtLabel'); if(ls){ ls.textContent='From Nocatee Welcome Center'; ls.style.display='inline'; }
+  }
   destIdx=cartNearest(destPt.lat,destPt.lng).idx;
   if(startIdx<0||destIdx<0){ setStatus('No cart network near that destination.'); return; }
   if(compOf[startIdx]!==compOf[destIdx]){ setStatus('No cart route from here to "'+d.name+'" (different network clusters).'); showRoute(null); return; }
@@ -954,7 +956,7 @@ var LOGOS=[
   {name:'blue water', url:'https://d2ol7oe51mr4n9.cloudfront.net/user_3GMMpPAbADd1bMVZfaXlzG5p6dM/36a7aa76-8036-4173-8267-c508382c2986.png', w:72, anchor:[36,34], place:{lat:30.100403,lng:-81.416122}},
 ];
 window.__logoSegMarkers=[];
-var LOGO_MIN_ZOOM=15;
+var LOGO_MIN_ZOOM=12;
 function updateLogoZoom(){
   if(document.getElementById('residentBar').style.display!=='flex'){ removeLogos(); return; }
   if(map.getZoom()>=LOGO_MIN_ZOOM) addLogos(); else removeLogos();
@@ -1043,7 +1045,7 @@ fetch(EV_URL).then(r=>r.ok?r.json():[]).then(arr=>{arr.forEach(x=>EV_NAMES.add(S
   setTimeout(()=>{
     if(G&&G.nodes&&G.nodes.length) return;
     const abs=new URL('../app/public/data/graph.json', location.href).href;
-    fetch(abs).then(r=>r.json()).then(j=>{ G=j; try{ computeComponents(); }catch(e){} try{ ensureNetwork(); }catch(e){} try{ enterResident(); }catch(e){} }).catch(e=>{ try{setStatus('Could not load network data.');}catch(_){} });
+    fetch(abs).then(r=>r.json()).then(j=>{ G=j; try{ computeComponents(); }catch(e){} try{ enterResident(); }catch(e){} }).catch(e=>{ try{setStatus('Could not load network data.');}catch(_){} });
   }, 2500);
 </script>
 </body>
