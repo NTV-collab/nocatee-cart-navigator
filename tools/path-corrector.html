@@ -292,7 +292,11 @@ function drawNetwork(){
     });
   });
 }
-function ensureNetwork(){ if(document.getElementById('residentBar') && document.getElementById('residentBar').style.display==='flex'){ computeComponents(); /* hidden in resident */ } else { computeComponents(); drawNetwork(); evStats(); } }
+function ensureNetwork(){
+  computeComponents();
+  const inResident = document.getElementById('residentBar') && document.getElementById('residentBar').style.display==='flex';
+  if(!inResident){ try{ drawNetwork(); }catch(e){} try{ evStats(); }catch(e){} }
+}
 
 function cartNearest(lat,lng){
   let b=-1,bd=1e18;
@@ -1045,9 +1049,17 @@ function enterDev(){
   document.getElementById('residentBar').style.display='none';
   document.getElementById('panel').style.display='block';
   const db=document.getElementById('devBadge'); if(db)db.style.display='block';
-  ensureNetwork();
   document.getElementById('tabDev').classList.add('on');
   document.getElementById('tabMap').classList.remove('on');
+  // ensure graph is loaded, then draw the network in dev view
+  if(G&&G.nodes&&G.nodes.length){ try{ ensureNetwork(); }catch(e){} return; }
+  const abs=new URL('../app/public/data/graph.json', location.href).href;
+  fetch(abs).then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); }).then(j=>{
+    G=j;
+    try{ computeComponents(); }catch(e){}
+    try{ ensureNetwork(); }catch(e){}
+    try{ drawGapMarkers&&drawGapMarkers(); }catch(e){}
+  }).catch(e=>{ try{setStatus('Graph load failed: '+e.message);}catch(_){}});
 }
 document.getElementById('gapsMode').addEventListener('click',function(){ this.classList.toggle('on');
   gapMode=this.classList.contains('on');
