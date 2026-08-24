@@ -92,6 +92,7 @@
   
   </div>
   <div id="residentStatusBar" style="font-size:11px;color:#2e5562;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:none"></div>
+  <div id="dbgLine" style="font-size:10px;color:#9db4bc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:none"></div>
 </div>
 <div id="panel" style="display:none;position:fixed;z-index:1200;left:12px;bottom:12px;top:66px;width:min(330px,94vw);background:#fff;color:#00364a;border:1px solid #dbe3e5;border-radius:18px;box-shadow:0 8px 28px rgba(0,54,74,.16);padding:14px;overflow:auto;font-size:13px">
   <h1>🛺 Network editor <button id="btnHide" title="collapse">–</button></h1>
@@ -551,6 +552,8 @@ function runRoute(){
   if(!r){msg.textContent="No cart route within the cluster — gap.";showRoute(null);}
   else showRoute(r.path);
 }
+function dbg(msg){ const el=document.getElementById('dbgLine'); if(el){ el.textContent=msg; el.style.display='block'; } }
+function dbgGraph(){ dbg('graph: '+(G&&G.nodes? (G.nodes.length/2)+' nodes':'NOT LOADED')+' · route: '+(drivePath&&drivePath.length? (drivePath.length-1)+' hops':'none')); }
 function armField(which){
   fieldArmed=which;
   msg.textContent="Set "+which+": click a spot on the map.";
@@ -877,7 +880,7 @@ function routeResident(start,d){
     setStatus('Route to '+d.name+': '+Math.round(r.dist)+'m · tap GO to drive.');
   }
 }
-document.getElementById('residentGo').addEventListener('click',()=>{ residentGo(); setTimeout(()=>{ if(drivePath&&drivePath.length>1){ enterDrive(); setTimeout(()=>{ if(drivePath&&drivePath.length>1){ try{ map.fitBounds(drivePath.map(p=>[G.nodes[p*2],G.nodes[p*2+1]]),{padding:[70,70],maxZoom:16}); }catch(e){} } },250); } }, 400); });
+document.getElementById('residentGo').addEventListener('click',()=>{ dbg('GO tapped · graph: '+(G&&G.nodes?'ok':'null')); residentGo(); setTimeout(()=>{ if(drivePath&&drivePath.length>1){ enterDrive(); dbgGraph(); setTimeout(()=>{ if(drivePath&&drivePath.length>1){ try{ map.fitBounds(drivePath.map(p=>[G.nodes[p*2],G.nodes[p*2+1]]),{padding:[70,70],maxZoom:16}); }catch(e){} dbgGraph(); } },250); } else { dbg('GO: no drivePath (route failed) · graph: '+(G&&G.nodes?'ok':'null')); } }, 400); });
 function recenterOnMe(){
   if(navigator.geolocation){
     navigator.geolocation.getCurrentPosition(pos=>{
@@ -992,6 +995,7 @@ fetch(EV_URL).then(r=>r.ok?r.json():[]).then(arr=>{arr.forEach(x=>EV_NAMES.add(S
   }).catch(e=>{stat.textContent="ERROR: "+e.message;setStatus("Graph failed to load.");});
   // default to the resident Map view on load
   setTimeout(()=>{ enterResident(); }, 300);
+  setTimeout(()=>{ dbg('graph: '+(G&&G.nodes? (G.nodes.length/2)+' nodes loaded':'NOT LOADED')); }, 3500);
   // Robust graph loader fallback: if the chained fetch never set G, load directly
   setTimeout(()=>{
     if(G&&G.nodes&&G.nodes.length) return;
