@@ -88,6 +88,7 @@
   </div>
   <button id="residentGo" style="background:#0099ba;color:#fff;border:0;border-radius:999px;padding:6px 14px;font:700 12px Outfit">GO</button>
   <button id="residentClear" title="Clear" style="background:#fff;color:#ba5700;border:1px solid #ba5700;border-radius:999px;padding:5px 10px;font:700 12px Outfit">✕</button>
+  <button id="satToggle" title="Toggle satellite view" style="background:#e6f3f6;border:1px solid #0099ba;color:#00788f;border-radius:999px;padding:5px 10px;font:600 12px Outfit">🛰</button>
   <button id="recenterBtn" title="Recenter on my location" style="background:#e6f3f6;border:1px solid #0099ba;color:#00788f;border-radius:999px;padding:5px 10px;font:600 12px Outfit">◎</button>
   
   </div>
@@ -203,6 +204,16 @@ let G=null, compOf=null, nComp=0;
 
 const map = L.map("map",{zoomSnap:.5}).setView([30.10,-81.42],13);
 L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",{attribution:"&copy; OpenStreetMap &copy; CARTO",maxZoom:20}).addTo(map);
+let satLayer=null, streetBaseTile=null;
+const SAT_URL='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+function addSatelliteLayer(){
+  if(satLayer){ if(!map.hasLayer(satLayer)) satLayer.addTo(map); return; }
+  satLayer=L.tileLayer(SAT_URL,{attribution:'&copy; Esri',maxZoom:19}).addTo(map);
+}
+function toggleSatellite(){
+  if(satLayer&&map.hasLayer(satLayer)){ map.removeLayer(satLayer); }
+  else addSatelliteLayer();
+}
 
 let network=null, routeLayer=null, pickA=null, pickB=null, markA=null, markB=null, snapPreview=null;
 let mode="test", selNode=null, fixes={}, lastStart=null, evSet=new Set();
@@ -229,6 +240,11 @@ panelEl.addEventListener("click",e=>{ if(panelEl.classList.contains("collapsed")
 function hav(a,b){const R=6371000,p1=a[0]*Math.PI/180,p2=b[0]*Math.PI/180,dp=(b[0]-a[0])*Math.PI/180,dl=(b[1]-a[1])*Math.PI/180;
   const x=Math.sin(dp/2)**2+Math.cos(p1)*Math.cos(p2)*Math.sin(dl/2)**2;return 2*R*Math.asin(Math.sqrt(x));}
 
+function callHydrateRemovals(){
+  if(!G) return;
+  try{ (G.user_removed_names||[]).forEach(nm=>removedNames.add(nm)); }catch(e){}
+  try{ (G.user_removed_edges||[]).forEach(id=>removedEdges.add(id)); }catch(e){}
+}
 function isCartLegalNode(j){ for(let e=0;e<G.edgesA.length;e++){ if((G.edgesA[e]===j||G.edgesB[e]===j)&&isCartLegal(e)) return true;} return false; }
 function isCartLegal(i){
   const ni=G.edgesNameIdx[i];
@@ -953,7 +969,7 @@ function ensureGraphLoaded(){
   if(G&&G.nodes&&G.nodes.length) return Promise.resolve(true);
   const abs=new URL('../app/public/data/graph.json', location.href).href;
   dbg('Loading network data…');
-  return fetch(abs).then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); }).then(j=>{ G=j; try{ computeComponents(); }catch(e){} try{ ensureNetwork(); }catch(e){} return true; }).catch(e=>{ dbg('Graph load failed: '+e.message, true); return false; });
+  return fetch(abs).then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); }).then(j=>{ G=j; callHydrateRemovals(); try{ computeComponents(); }catch(e){} try{ ensureNetwork(); }catch(e){} return true; }).catch(e=>{ dbg('Graph load failed: '+e.message, true); return false; });
 }
 document.getElementById('residentGo').addEventListener('click',()=>{
   dbg('GO tapped · graph: '+(G&&G.nodes?'ok':'null')+' → loading if needed');
@@ -974,6 +990,7 @@ function recenterOnMe(){
   } else setStatus('Geolocation not supported.');
 }
 document.getElementById('recenterBtn').addEventListener('click',recenterOnMe);
+document.getElementById('satToggle')&&document.getElementById('satToggle').addEventListener('click',toggleSatellite);
 
 function residentClearRoute(){
   clearRoute();
@@ -1064,7 +1081,7 @@ function enterDev(){
   if(G&&G.nodes&&G.nodes.length){ if(netVisible!==false){ try{ ensureNetwork(); }catch(e){} } return; }
   const abs=new URL('../app/public/data/graph.json', location.href).href;
   fetch(abs).then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); }).then(j=>{
-    G=j;
+    G=j; callHydrateRemovals();
     try{ computeComponents(); }catch(e){}
     try{ ensureNetwork(); }catch(e){}
     try{ drawGapMarkers&&drawGapMarkers(); }catch(e){}
@@ -1091,7 +1108,7 @@ fetch(EV_URL).then(r=>r.ok?r.json():[]).then(arr=>{arr.forEach(x=>EV_NAMES.add(S
   setTimeout(()=>{
     if(G&&G.nodes&&G.nodes.length) return;
     const abs=new URL('../app/public/data/graph.json', location.href).href;
-    fetch(abs).then(r=>r.json()).then(j=>{ G=j; try{ computeComponents(); }catch(e){} try{ enterResident(); }catch(e){} }).catch(e=>{ try{setStatus('Could not load network data.');}catch(_){} });
+    fetch(abs).then(r=>r.json()).then(j=>{ G=j; callHydrateRemovals(); try{ computeComponents(); }catch(e){} try{ enterResident(); }catch(e){} }).catch(e=>{ try{setStatus('Could not load network data.');}catch(_){} });
   }, 2500);
 </script>
 </body>
