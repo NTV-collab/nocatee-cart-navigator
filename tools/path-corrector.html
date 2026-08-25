@@ -1151,6 +1151,7 @@ function findDrawnTrails(){
   const useBand = drawnSet.size===0;
   const trails=[];
   const seen=new Set();
+  const e2map={};
   for(let i=0;i<G.edgesA.length;i++){
     const a=G.edgesA[i], b=G.edgesB[i];
     const isDrawn = drawnSet.has(i) || (useBand && (a>=band||b>=band));
