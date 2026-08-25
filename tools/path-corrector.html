@@ -472,6 +472,7 @@ function bearingAng(a,b){
   return Math.atan2(y,x)*180/Math.PI;
 }
 function exitDrive(){
+  resetMapRotation();
   driveMode=false;
   document.getElementById('driveUI').style.display='none';
   document.getElementById('tripBar').style.display='none';
@@ -600,8 +601,24 @@ function makeYouMarker(lat,lng,deg){
   const m=L.marker([lat,lng],{icon:ic,interactive:false,zIndexOffset:1000,pane:'youPane'}).addTo(map);
   return m;
 }
+function resetMapRotation(){
+  try{ const ov=map.getPane('overlayPane'); if(ov) ov.style.transform=''; const mr=map.getPane('markerPane'); if(mr) mr.style.transform=''; }catch(e){}
+}
 function setYouHeading(deg){
-  try{ const el=youMarker&&youMarker.getElement(); if(el){ const d=el.querySelector('div'); if(d) d.style.transform='rotate('+Math.round(deg)+'deg)'; } }catch(e){}
+  try{
+    // heading-up map rotation in drive mode: map rotates so user points up
+    if(driveMode){
+      const c=map.getContainer(), pane=map.getPane('youPane');
+      map.setBearing&&map.setBearing(deg);
+      // CSS approach: rotate the map's overlay+marker panes, counter-rotate the arrow
+      const r=-deg;
+      const ov=map.getPane('overlayPane'); if(ov) ov.style.transform='rotate('+r+'deg)';
+      const mr=map.getPane('markerPane'); if(mr) mr.style.transform='rotate('+r+'deg)';
+      const el=youMarker&&youMarker.getElement(); if(el){ const d=el.querySelector('div'); if(d) d.style.transform='rotate('+ (deg) +'deg)'; }
+    } else {
+      const el=youMarker&&youMarker.getElement(); if(el){ const d=el.querySelector('div'); if(d) d.style.transform='rotate('+Math.round(deg)+'deg)'; }
+    }
+  }catch(e){}
 }
 function rotateYouMarker(lat,lng){
   if(!youMarker) return;
