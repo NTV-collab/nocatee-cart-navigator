@@ -539,7 +539,7 @@ function ensureWatch(){
     // move "you" marker
     if(!youMarker){ youMarker=makeYouMarker(lat,lng,0); }
     else youMarker.setLatLng([lat,lng]);
-    rotateYouMarker(lat,lng);
+    if(pos.coords&&pos.coords.heading!=null){ setYouHeading(pos.coords.heading); } else { rotateYouMarker(lat,lng); }
     if(driveMode&&drivePath){
       // deviation detection
       const dMin=nearestDistOnRoute(drivePath,lat,lng);
@@ -582,10 +582,14 @@ function ensureWatch(){
 let lastYouLat=null,lastYouLng=null;
 function makeYouMarker(lat,lng,deg){
   if(!map.getPane('youPane')){ map.createPane('youPane'); map.getPane('youPane').style.zIndex=800; map.getPane('youPane').style.pointerEvents='none'; }
-  const html='<div style="width:30px;height:30px;transform:rotate('+deg+'deg);line-height:30px;text-align:center;font-size:20px;color:#1b2a5e;text-shadow:0 0 0 2px #fff,0 0 0 3px rgba(255,255,255,.6)">▲</div>';
-  const ic=L.divIcon({className:'',html, iconSize:[30,30], iconAnchor:[15,15]});
+  const svg='<svg width="36" height="46" viewBox="0 0 36 46" style="filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))"><path d="M18 1 L31 19 L22 19 L22 45 L14 45 L14 19 L5 19 Z" fill="#173a6e" stroke="#ffffff" stroke-width="3"/></svg>';
+  const html='<div style="width:36px;height:46px;transform:rotate('+deg+'deg);transform-origin:50% 50%">'+svg+'</div>';
+  const ic=L.divIcon({className:'',html, iconSize:[36,46], iconAnchor:[18,23]});
   const m=L.marker([lat,lng],{icon:ic,interactive:false,zIndexOffset:1000,pane:'youPane'}).addTo(map);
   return m;
+}
+function setYouHeading(deg){
+  try{ const el=youMarker&&youMarker.getElement(); if(el){ const d=el.querySelector('div'); if(d) d.style.transform='rotate('+Math.round(deg)+'deg)'; } }catch(e){}
 }
 function rotateYouMarker(lat,lng){
   if(!youMarker) return;
@@ -608,7 +612,7 @@ function showRerouteBadge(txt){ const oldB=document.getElementById('rerouteBadge
 function nearestOnRoutePath(path,lat,lng){ return nearestDistOnRoute(path,lat,lng).idx; }
 
 let lastFollowT=null;
-function driveZoom(){ return (window.innerWidth<700)?16.5:17; }
+function driveZoom(){ return (window.innerWidth<700)?17.5:18; }
 function enterDrive(){
   if(!drivePath){ return; }
   driveMode=true;
