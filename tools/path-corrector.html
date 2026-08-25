@@ -1198,9 +1198,18 @@ function applyAuditName(){
   if(idx<0){ idx=G.names.length; G.names.push(nm); }
   let total=0;
   auditSel.forEach(e=>{ G.edgesNameIdx[e]=idx; total++; });
-  setStatus('Named '+total+' segments "'+nm+'" — drawn paths now group under that name.');
+  dbg('Named '+total+' segments "'+nm+'" — added to graph & removed from list.', false);
   exportBtn.disabled=false;
+  // remove this trail from the audit list (it's now named)
+  try{ auditTrails = auditTrails.filter(t=>t!==auditSel); }catch(e){}
+  auditSel=[];
+  document.getElementById('auditNameInput').value='';
+  document.getElementById('auditRename').style.display='none';
   renderAudit();
+  // auto-advance to the next unnamed trail
+  try{ if(auditTrails&&auditTrails[0]){ selectAudit(0); dbg('Next: unnamed drawn path — rename or group.', false); } }catch(e){}
+  // make Export clearly available + scroll it into view
+  try{ const eb=document.getElementById('export'); eb.style.boxShadow='0 0 0 2px #0099ba, 0 4px 12px rgba(0,153,186,.4)'; eb.scrollIntoView({behavior:'smooth',block:'nearest'}); }catch(e){}
   try{ ensureNetwork(); }catch(e){}
 }
 
