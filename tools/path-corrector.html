@@ -1030,15 +1030,7 @@ document.getElementById('residentGo').addEventListener('click',()=>{
     setTimeout(()=>{ if(drivePath&&drivePath.length>1){ enterDrive(); dbgClear(); } else { dbg('GO: no route produced · check start/dest', true); } }, 400);
   });
 });
-function recenterOnMe(){
-  if(navigator.geolocation){
-    navigator.geolocation.getCurrentPosition(pos=>{
-      startPt={lat:pos.coords.latitude,lng:pos.coords.longitude};
-      const rsv2=document.getElementById('residentStartVal'); if(rsv2) rsv2.textContent='Your location';
-      map.setView([startPt.lat,startPt.lng], driveZoom());
-    },()=>setStatus('Location unavailable — check permissions.'),{timeout:6000,maximumAge:20000});
-  } else setStatus('Geolocation not supported.');
-}
+function recenterOnMe(){ requestLocation(true); }
 document.getElementById('recenterBtn').addEventListener('click',recenterOnMe);
 document.getElementById('satToggle')&&document.getElementById('satToggle').addEventListener('click',toggleSatellite);
 
@@ -1083,6 +1075,21 @@ function addLogos(){
 }
 function removeLogoSeg(){ (window.__logoSegMarkers||[]).forEach(m=>map.removeLayer(m)); window.__logoSegMarkers=[]; }
 function removeLogos(){ removeLogoSeg(); }
+function requestLocation(force){
+  if(!navigator.geolocation){ setStatus('Location not supported on this device.'); return; }
+  navigator.geolocation.getCurrentPosition(pos=>{
+    startPt={lat:pos.coords.latitude,lng:pos.coords.longitude};
+    const ls=document.getElementById('startPtLabel'); if(ls){ ls.textContent='From · Your location'; ls.style.display='inline'; }
+    const note=document.getElementById('locNote'); if(note) note.style.display='none';
+    setStatus('Location found — routing from your position.');
+    map.setView([startPt.lat,startPt.lng], driveZoom());
+    const rsv2=document.getElementById('residentStartVal'); if(rsv2) rsv2.textContent='Your location';
+  }, err=>{
+    if(force) setStatus('Location blocked. Enable it in your browser settings, then tap Allow/Recenter.', true);
+    const note=document.getElementById('locNote'); if(note) note.style.display='block';
+    const rsv3=document.getElementById('residentStartVal'); if(rsv3) rsv3.textContent='Use my location';
+  },{enableHighAccuracy:true, timeout:8000, maximumAge:30000});
+}
 function enterResident(){
   document.getElementById('panel').style.display='none';
   document.getElementById('residentBar').style.display='flex';
@@ -1095,14 +1102,17 @@ function enterResident(){
   document.getElementById('tabDev').classList.remove('on');
   residentFillDest();
   updateLogoZoom();
-  // try auto location
-  if(navigator.geolocation){
-    navigator.geolocation.getCurrentPosition(pos=>{
-      startPt={lat:pos.coords.latitude,lng:pos.coords.longitude};
-      const rsv2=document.getElementById('residentStartVal'); if(rsv2) rsv2.textContent='Your location';
-      map.setView([startPt.lat,startPt.lng],14);
-    },()=>{ const rsv3=document.getElementById('residentStartVal'); if(rsv3) rsv3.textContent='Use my location'; },{timeout:6000,maximumAge:120000});
-  }
+  // try auto location (best-effort; may be blocked until user taps)
+  requestLocation(false);
+  // if denied/blocked, show a prompt asking the user to allow location
+  setTimeout(()=>{
+    if(!startPt){
+      const rb=document.getElementById('residentBar');
+      const note=document.getElementById('locNote');
+      if(!note){ const n=document.createElement('div'); n.id='locNote'; n.style.cssText='font-size:11px;color:#ba5700;margin-top:6px'; n.innerHTML='Allow location access to auto-fill your start point. <a href="#" onclick="event.preventDefault();requestLocation(true)" style="color:#0099ba;font-weight:700">Allow</a>'; rb.appendChild(n); }
+      else note.style.display='block';
+    }
+  }, 1500);
 }
 function armDev(){
   document.getElementById('residentBar').style.display='none';
