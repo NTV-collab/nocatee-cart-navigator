@@ -425,8 +425,20 @@ function showRoute(path){
 }
 
 let driveMode=false, drivePath=null;
+function ensureGraphReady(){
+  if(!(G&&G.nodes&&G.nodes.length)){
+    try{ const abs=new URL('../app/public/data/graph.json', location.href).href;
+      return fetch(abs).then(r=>r.json()).then(j=>{ G=j; callHydrateRemovals(); try{ computeComponents(); }catch(e){} return true; }).catch(()=>false);
+    }catch(e){ return Promise.resolve(false); }
+  }
+  if(!compOf){ try{ computeComponents(); }catch(e){} }
+  return Promise.resolve(true);
+}
 function residentPreviewRoute(d){
   if(driveMode) exitDrive();
+  ensureGraphReady().then(ok=>{ if(!ok){ setStatus('Network data not loaded.'); return; } previewRouteNow(d); });
+}
+function previewRouteNow(d){
   const startIdx=startPt?cartNearest(startPt.lat,startPt.lng).idx:cartNearest(startAnchorPt().lat,startAnchorPt().lng).idx;
   const destIdx=cartNearest(d.lat,d.lng).idx;
   if(startIdx<0||destIdx<0){ setStatus('No cart network near "'+d.name+'".'); return; }
@@ -1002,7 +1014,11 @@ function geocodeGoogle(q){
   }).catch(()=>null);
 }
 let destMarker=null;
-function routeToPoint(dp){
+function routeToPoint(dp){ ensureRoutePoint(dp); }
+function ensureRoutePoint(dp){
+  ensureGraphReady().then(ok=>{ if(!ok){ setStatus('Network data not loaded.'); return; } routeToPointNow(dp); });
+}
+function routeToPointNow(dp){
   const startIdx=startPt?cartNearest(startPt.lat,startPt.lng).idx:cartNearest(startAnchorPt().lat,startAnchorPt().lng).idx;
   const destIdx=cartNearest(dp.lat,dp.lng).idx;
   if(startIdx<0||destIdx<0){ setStatus('No cart network near that spot.'); return; }
@@ -1143,6 +1159,8 @@ function requestLocation(force){
 }
 function enterResident(){
   document.getElementById('panel').style.display='none';
+  // persistent location: arrow appears as soon as GPS resolves, in any view
+  try{ ensureWatch(); }catch(e){}
   document.getElementById('residentBar').style.display='flex';
   const sb=document.getElementById('residentStatusBar'); if(sb)sb.style.display='block';
   // hide all dev overlays for a clean user map
