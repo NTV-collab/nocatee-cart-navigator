@@ -110,6 +110,7 @@
   <label class="tgl"><input type="checkbox" id="netToggle" checked> show network</label>
   <label class="tgl"><input type="checkbox" id="showOthers" checked> show non-cart roads</label>
   <label class="tgl"><input type="checkbox" id="classifyMode"> classify: click a road to (un)EV-approve it</label>
+  <label class="tgl"><input type="checkbox" id="nameMode"> name-check: click a path to see its name</label>
   <div class="mode" style="margin-top:8px"><button id="gapsMode">Gaps: show &amp; fix</button></div>
   <div id="gapsList" style="display:none;max-height:150px;overflow:auto;font-size:11px;margin-top:6px"></div>
   <div id="savedGapsBox" style="display:none">
@@ -249,6 +250,32 @@ function setStatus(t){
 const fixBtn=document.getElementById("mFix"), testBtn=document.getElementById("mTest");
 const exportBtn=document.getElementById("export"), showOthersCb=document.getElementById("showOthers");
 const classifyCb=document.getElementById("classifyMode");
+const nameModeCb=document.getElementById("nameMode");
+function nameCheckAt(latlng){
+  if(!G||!G.edgesA) return;
+  const cosv=Math.max(1e-9,Math.cos(latlng.lat*Math.PI/180));
+  let best=null,bd=Infinity;
+  for(let i=0;i<G.edgesA.length;i++){
+    const a=G.edgesA[i],b=G.edgesB[i];
+    const ni0=G.edgesNameIdx[i]; if(ni0>=0&&removedNames.has(G.names[ni0])) continue;
+    const ax=G.nodes[a*2+1]*cosv,ay=G.nodes[a*2],bx=G.nodes[b*2+1]*cosv,by=G.nodes[b*2];
+    const abx=bx-ax,aby=by-ay,len2=abx*abx+aby*aby;let t=0;if(len2>1e-12){t=((latlng.lng*cosv-ax)*abx+(latlng.lat-ay)*aby)/len2;t=t<0?0:t>1?1:t;}
+    const dx=latlng.lng*cosv-(ax+abx*t),dy=latlng.lat-(ay+aby*t),d=dx*dx+dy*dy;
+    if(d<bd){bd=d;best=i;}
+  }
+  if(best===null){ dbg('No path nearby.', false); return; }
+  const ni=G.edgesNameIdx[best];
+  const nm=ni>=0?G.names[ni]:'(unnamed)';
+  const segs= ni>=0? G.edgesNameIdx.filter(x=>x===ni).length : 1;
+  dbg('“'+nm+'” · '+segs+' segments · '+Math.round(Math.sqrt(bd)*111320/1000*1000)+' m away', false);
+  // highlight the clicked edge briefly
+  try{ if(nameFlashLayer) map.removeLayer(nameFlashLayer); nameFlashLayer=L.layerGroup().addTo(map);
+    const a=G.edgesA[best],b=G.edgesB[best];
+    L.polyline([[G.nodes[a*2],G.nodes[a*2+1]],[G.nodes[b*2],G.nodes[b*2+1]]],{color:'#ff9800',weight:6,opacity:.9}).addTo(nameFlashLayer);
+    setTimeout(()=>{ try{map.removeLayer(nameFlashLayer); nameFlashLayer=null;}catch(e){} },2500);
+  }catch(e){}
+}
+let nameFlashLayer=null;
 const netToggleCb=document.getElementById("netToggle");
 let netVisible=true;
 netToggleCb&&netToggleCb.addEventListener('change',()=>{ netVisible=netToggleCb.checked; if(!G) return; if(netVisible){ try{ensureNetwork();}catch(e){} } else if(network){ try{map.removeLayer(network);}catch(e){} } });
@@ -661,7 +688,8 @@ function armField(which){
   msg.textContent="Set "+which+": click a spot on the map.";
 }
 map.on("click",e=>{
-  if(classifyCb.checked)return; // road-click toggles are handled on road layers
+  if(classifyCb&&classifyCb.checked)return; // road-click toggles are handled on road layers
+  if(nameModeCb&&nameModeCb.checked && mode!=="remove" && mode!=="fix" && mode!=="draw"){ nameCheckAt(e.latlng); return; }
   if(mode==="remove"){
     // find nearest cart-legal edge to the click
     let best=null,bd=Infinity;
@@ -761,6 +789,9 @@ function endDraw(){
     };
     bridge(ids[0],[drawPts[0][0],drawPts[0][1]]);
     bridge(ids[ids.length-1],[drawPts[drawPts.length-1][0],drawPts[drawPts.length-1][1]]);
+    // durable marker: record the drawn edge indices
+    G.drawnEdges = G.drawnEdges || [];
+    for(let e2=(G.edgesA.length-ids.length+1)-(ids.length-1); e2<G.edgesA.length; e2++){ if(!G.drawnEdges.includes(e2)) G.drawnEdges.push(e2); }
     exportBtn.disabled=false;
     setStatus("Drew a new trail ("+ids.length+" points, "+(ids.length-1)+" segments) — on network. Continue or Export.");
     ensureNetwork();
@@ -1113,25 +1144,19 @@ var auditTrails=[];
 function findDrawnTrails(){
   if(!G||!G.nodes) return [];
   const N=G.nodes.length/2;
-  // drawn = edges touching the appended node band (nodes >= N-80) or in-session added
-  const band=Math.max(0,N-120);
+  // drawn = edges explicitly marked (durable) OR touching the appended node band
+  const band=Math.max(0,N-160);
+  const drawnSet = new Set((G.drawnEdges||[]));
+  // if no durable marks exist, fall back to band detection
+  const useBand = drawnSet.size===0;
   const trails=[];
   const seen=new Set();
   for(let i=0;i<G.edgesA.length;i++){
     const a=G.edgesA[i], b=G.edgesB[i];
-    if(a>=band||b>=band){
-      if(seen.has(i)) continue;
-      // gather the connected run of drawn edges
-      const run=[i]; seen.add(i);
-      // simple: just list each drawn edge individually with its endpoints
-    }
+    const isDrawn = drawnSet.has(i) || (useBand && (a>=band||b>=band));
+    if(isDrawn){ e2map[i]=[a,b]; }
   }
   // group drawn edges into connected chains
-  const e2map={};
-  for(let i=0;i<G.edgesA.length;i++){
-    const a=G.edgesA[i], b=G.edgesB[i];
-    if(a>=band||b>=band){ e2map[i]=[a,b]; }
-  }
   const byNode={};
   Object.keys(e2map).forEach(k=>{ const [a,b]=e2map[k]; (byNode[a]=byNode[a]||[]).push(+k); (byNode[b]=byNode[b]||[]).push(+k); });
   const used=new Set();
