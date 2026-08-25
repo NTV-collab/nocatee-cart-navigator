@@ -1175,6 +1175,11 @@ function selectAudit(i){
   auditSel.forEach(e=>{ const a=G.edgesA[e],b=G.edgesB[e];
     L.polyline([[G.nodes[a*2],G.nodes[a*2+1]],[G.nodes[b*2],G.nodes[b*2+1]]],{color:'#ff9800',weight:5,opacity:.95}).addTo(auditLayer);
   });
+  // zoom to the selected path
+  try{
+    const ll=[]; auditSel.forEach(e=>{ const a=G.edgesA[e],b=G.edgesB[e]; ll.push([G.nodes[a*2],G.nodes[a*2+1]]); ll.push([G.nodes[b*2],G.nodes[b*2+1]]); });
+    if(ll.length){ map.fitBounds(ll,{padding:[60,60],maxZoom:17}); }
+  }catch(e){}
 }
 function fillAuditNamePick(){
   const sel=document.getElementById('auditNamePick');
