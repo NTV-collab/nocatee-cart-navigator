@@ -1144,17 +1144,17 @@ var auditTrails=[];
 function findDrawnTrails(){
   if(!G||!G.nodes) return [];
   const N=G.nodes.length/2;
-  // drawn = edges explicitly marked (durable) OR touching the appended node band
   const band=Math.max(0,N-160);
   const drawnSet = new Set((G.drawnEdges||[]));
-  // if no durable marks exist, fall back to band detection
-  const useBand = drawnSet.size===0;
+  // include: durable drawn marks, OR band edges (drawn legacy), OR any UNNAMED edge (user candidates)
+  const useBand=true;
   const trails=[];
   const seen=new Set();
   const e2map={};
   for(let i=0;i<G.edgesA.length;i++){
     const a=G.edgesA[i], b=G.edgesB[i];
-    const isDrawn = drawnSet.has(i) || (useBand && (a>=band||b>=band));
+    const ni=G.edgesNameIdx[i];
+    const isDrawn = drawnSet.has(i) || (a>=band||b>=band) || ni<0;   // unnamed = candidate
     if(isDrawn){ e2map[i]=[a,b]; }
   }
   // group drawn edges into connected chains
@@ -1175,7 +1175,7 @@ function findDrawnTrails(){
 function renderAudit(){
   const box=document.getElementById('auditList');
   auditTrails=findDrawnTrails();
-  box.innerHTML='<b>Drawn paths: '+auditTrails.length+'</b><br/>'+
+  box.innerHTML='<b>Unnamed/drawn chains: '+auditTrails.length+'</b><br/>'+
     auditTrails.map((chain,i)=>{
       const e0=chain[0]; const a=G.edgesA[e0], b=G.edgesB[e0];
       const lat=(G.nodes[a*2]+G.nodes[b*2])/2, lng=(G.nodes[a*2+1]+G.nodes[b*2+1])/2;
