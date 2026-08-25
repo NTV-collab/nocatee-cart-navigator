@@ -130,7 +130,7 @@
   <div id="auditRename" style="display:none;gap:6px;margin-top:6px;align-items:center">
     <input id="auditNameInput" placeholder="New name" style="flex:1;min-width:90px;border:1px solid #dbe3e5;border-radius:8px;padding:5px 8px;font:600 12px Outfit;color:#00364a"/>
     <select id="auditNamePick" style="border:1px solid #dbe3e5;border-radius:8px;padding:4px;font:600 11px Outfit;color:#00364a;max-width:120px"><option value="">Group with…</option></select>
-    <button id="auditApply" style="background:#0099ba;color:#fff;border:0;border-radius:999px;padding:6px 12px;font:700 11px Outfit">Rename</button>
+    <button id="auditApply" onclick="try{ applyAuditName(); }catch(e){ try{dbg('Rename error: '+e.message,true);}catch(_){} }" style="background:#0099ba;color:#fff;border:0;border-radius:999px;padding:6px 12px;font:700 11px Outfit">Rename</button>
   </div>
   <button id="export" disabled>Export corrected graph.json</button>
   <div class="stat" id="stat">loading…</div>
@@ -1213,7 +1213,7 @@ function applyAuditName(){
   try{ ensureNetwork(); }catch(e){}
 }
 
-document.getElementById('auditApply').addEventListener('click',applyAuditName);
+
 var auditLayer=null;
 document.getElementById('gapsMode').addEventListener('click',function(){ this.classList.toggle('on');
   gapMode=this.classList.contains('on');
