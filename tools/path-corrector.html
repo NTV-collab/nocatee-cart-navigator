@@ -1096,8 +1096,8 @@ function enterDev(){
 }
 
 // ---- Audit drawn paths ----
-let auditSel=[]; // selected edge ids of current trail
-let auditTrails=[];
+var auditSel=[]; // selected edge ids of current trail
+var auditTrails=[];
 function findDrawnTrails(){
   if(!G||!G.nodes) return [];
   const N=G.nodes.length/2;
@@ -1194,7 +1194,7 @@ document.getElementById('auditMode').addEventListener('click',function(){ this.c
   if(show) renderAudit();
 });
 document.getElementById('auditApply').addEventListener('click',applyAuditName);
-let auditLayer=null;
+var auditLayer=null;
 document.getElementById('gapsMode').addEventListener('click',function(){ this.classList.toggle('on');
   gapMode=this.classList.contains('on');
   const lst=document.getElementById('gapsList'); lst.style.display=gapMode?'block':'none';
