@@ -1155,8 +1155,42 @@ function addLogos(){
 }
 function removeLogoSeg(){ (window.__logoSegMarkers||[]).forEach(m=>map.removeLayer(m)); window.__logoSegMarkers=[]; }
 function removeLogos(){ removeLogoSeg(); }
+/* ---- iOS compass (device orientation) for stationary heading ---- */
+let compassActive=false;
+function initCompass(){
+  if(compassActive) return;
+  const DO=window.DeviceOrientationEvent;
+  if(!DO || typeof DO.requestPermission!=='function') return; // not iOS 13+ Safari
+  DO.requestPermission().then(state=>{
+    if(state==='granted'){
+      compassActive=true;
+      window.addEventListener('deviceorientation', onCompass, true);
+    }
+  }).catch(()=>{});
+}
+function onCompass(e){
+  if(e.webkitCompassHeading!=null){
+    setYouHeading(e.webkitCompassHeading);
+  } else if(e.alpha!=null){
+    // non-commercial Safari: convert alpha (0=N) to heading; alpha is +ccw from north
+    let h=(360 - e.alpha + (e.webkitCompassAccuracy||0)) % 360;
+    if(e.gamma!=null && Math.abs(e.gamma)>10) h=360-e.alpha; // tilted; ignore accuracy
+    setYouHeading((h+360)%360);
+  }
+}
+// request compass permission alongside the location Allow flow (user gesture)
+function tryEnableCompass(){
+  const DO=window.DeviceOrientationEvent||(window.DeviceOrientationEvent);
+  if(DO && typeof DO.requestPermission==='function'){
+    try{ DO.requestPermission().then(function(state){ if(state==='granted'){ compassActive=true; window.addEventListener('deviceorientation', onCompass, true); } }); }catch(e){}
+  } else if(window.DeviceOrientationEvent){
+    // desktop/Android style: just add listener
+    window.addEventListener('deviceorientation', onCompass, true); compassActive=true;
+  }
+}
 function requestLocation(force){
   if(!navigator.geolocation){ setStatus('Location not supported on this device.'); return; }
+  try{ tryEnableCompass(); }catch(e){}
   navigator.geolocation.getCurrentPosition(pos=>{
     startPt={lat:pos.coords.latitude,lng:pos.coords.longitude};
     try{ resetMapRotation(); }catch(e){}
