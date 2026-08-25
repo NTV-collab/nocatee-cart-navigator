@@ -393,6 +393,18 @@ function buildCartAdj(){
 function edgeNameOf(a,b){for(let i=0;i<G.edgesA.length;i++){const x=G.edgesA[i],y=G.edgesB[i];if((x===a&&y===b)||(x===b&&y===a))return G.edgesNameIdx[i]>=0?G.names[G.edgesNameIdx[i]]:"(unnamed)";}return "(?)";}
 
 function clearRoute(){if(routeLayer)map.removeLayer(routeLayer);routeLayer=null;if(markA)map.removeLayer(markA);if(markB)map.removeLayer(markB);markA=markB=null;if(pickA)map.removeLayer(pickA);if(pickB)map.removeLayer(pickB);pickA=pickB=null;}
+function drawRouteFrom(path, fromIdx){
+  if(!path||path.length<2) return;
+  try{
+    const ll=path.slice(fromIdx).map(i=>[G.nodes[i*2],G.nodes[i*2+1]]);
+    if(ll.length<2) return;
+    if(routeLayer){ map.removeLayer(routeLayer); }
+    if(!map.getPane('routePane')){ map.createPane('routePane'); map.getPane('routePane').style.zIndex=700; map.getPane('routePane').style.pointerEvents='none'; }
+    routeLayer=L.layerGroup(undefined,{pane:'routePane'}).addTo(map);
+    L.polyline(ll,{color:'#ffffff',weight:12,opacity:.95,lineJoin:'round',pane:'routePane'}).addTo(routeLayer);
+    L.polyline(ll,{color:'#0099ba',weight:8,opacity:1,lineJoin:'round',pane:'routePane'}).addTo(routeLayer);
+  }catch(e){}
+}
 function showRoute(path){
   clearRoute();
   if(!path)return;
@@ -525,12 +537,13 @@ function ensureWatch(){
   watchId=navigator.geolocation.watchPosition(pos=>{
     const lat=pos.coords.latitude, lng=pos.coords.longitude;
     // move "you" marker
-    if(!youMarker){ youMarker=L.circleMarker([lat,lng],{radius:9,color:'#fff',weight:2,fillColor:'#0099ba',fillOpacity:1}).addTo(map); }
+    if(!youMarker){ youMarker=makeYouMarker(lat,lng,0); }
     else youMarker.setLatLng([lat,lng]);
+    rotateYouMarker(lat,lng);
     if(driveMode&&drivePath){
       // deviation detection
       const dMin=nearestDistOnRoute(drivePath,lat,lng);
-      if(dMin.d>40 && !rerouteGuard){
+      if(dMin.d>30 && !rerouteGuard){
         rerouteGuard=true;
         showRerouteBadge();
         const dest=resolveDestPt();
@@ -544,7 +557,9 @@ function ensureWatch(){
         }
         const adj=buildCartAdj(), r=dijkstraCart(fromIdx.idx,destIdx.idx,adj);
         if(!r){ setStatus('Re-route failed — no legal path. Set destination again.'); clearRoute(); exitDrive(); setTimeout(()=>{rerouteGuard=false;},500); return; }
-        drivePath=r.path; updateNextTurn(0);
+        drivePath=r.path; progIdx=0; lastYouLat=null;
+        try{ routeLayer&&map.removeLayer(routeLayer); routeLayer=null; showRoute(r.path); }catch(e){}
+        updateNextTurn(0);
         const b=document.getElementById('rerouteBadge'); if(b) b.remove();
         const nb=document.createElement('div'); nb.id='rerouteBadge'; nb.style.cssText='position:fixed;top:58px;left:12px;z-index:1100;background:#ba5700;color:#fff;font:700 11px Outfit;padding:6px 12px;border-radius:999px'; nb.textContent='Re-routed ✓';
         document.body.appendChild(nb); setTimeout(()=>{const x=document.getElementById('rerouteBadge'); if(x)x.remove();},1800);
@@ -553,6 +568,8 @@ function ensureWatch(){
       }
       const idx=nearestOnRoutePath(drivePath,lat,lng);
       progIdx=idx;
+      // fade travelled part: redraw route from current idx
+      if(idx>1){ drawRouteFrom(drivePath, idx); }
       // follow softly: only recenter when we've moved noticeably (>25m) so it doesn't jitter
       if(!lastFollowT||hav([lastFollowT[0],lastFollowT[1]],[lat,lng])>25){
         map.setView([lat,lng], driveZoom(), {animate:false});
@@ -561,6 +578,23 @@ function ensureWatch(){
       updateNextTurn(idx);
     }
   }, err=>console.warn('gps err',err), {enableHighAccuracy:true, maximumAge:1500, timeout:12000});
+}
+let lastYouLat=null,lastYouLng=null;
+function makeYouMarker(lat,lng,deg){
+  if(!map.getPane('youPane')){ map.createPane('youPane'); map.getPane('youPane').style.zIndex=800; map.getPane('youPane').style.pointerEvents='none'; }
+  const html='<div style="width:30px;height:30px;transform:rotate('+deg+'deg);line-height:30px;text-align:center;font-size:20px;color:#1b2a5e;text-shadow:0 0 0 2px #fff,0 0 0 3px rgba(255,255,255,.6)">▲</div>';
+  const ic=L.divIcon({className:'',html, iconSize:[30,30], iconAnchor:[15,15]});
+  const m=L.marker([lat,lng],{icon:ic,interactive:false,zIndexOffset:1000,pane:'youPane'}).addTo(map);
+  return m;
+}
+function rotateYouMarker(lat,lng){
+  if(!youMarker) return;
+  if(lastYouLat!==null){
+    const dLat=lat-lastYouLat, dLng=lng-lastYouLng;
+    const deg=Math.round(Math.atan2(dLng*Math.cos(lat*Math.PI/180), dLat)*180/Math.PI);
+    const el=youMarker.getElement(); if(el){ const d=el.querySelector('div'); if(d) d.style.transform='rotate('+deg+'deg)'; }
+  }
+  lastYouLat=lat; lastYouLng=lng;
 }
 function nearestDistOnRoute(path,lat,lng){
   let b=0,bd=1e18;
@@ -574,7 +608,7 @@ function showRerouteBadge(txt){ const oldB=document.getElementById('rerouteBadge
 function nearestOnRoutePath(path,lat,lng){ return nearestDistOnRoute(path,lat,lng).idx; }
 
 let lastFollowT=null;
-function driveZoom(){ return (window.innerWidth<700)?15.5:16.5; }
+function driveZoom(){ return (window.innerWidth<700)?16.5:17; }
 function enterDrive(){
   if(!drivePath){ return; }
   driveMode=true;
@@ -590,6 +624,7 @@ function enterDrive(){
   if(!sx){ const a=startAnchorPt(); sx=a.lat; sy=a.lng; }
   map.setView([sx,sy], driveZoom(), {animate:true});
   lastFollowT=[sx,sy];
+  if(!youMarker){ youMarker=makeYouMarker(sx,sy,0); lastYouLat=sx; lastYouLng=sy; }
   ensureWatch();
 }
 function updateTripInfo(){
@@ -612,14 +647,26 @@ function updateTripInfo(){
 }
 function updateNextTurn(offset){
   const path=drivePath; if(!path||path.length<2){ document.getElementById('nextTurnText').textContent='Arrive'; return; }
-  const t=firstTurnIndex(path,offset);
-  if(t<0){ document.getElementById('nextTurnArrow').textContent='✓'; document.getElementById('nextTurnText').textContent='Arrive at destination'; document.getElementById('nextTurnDist').textContent=''; return; }
-  const p0=path[t-2],p1=path[t-1],p2=path[t];
-  const b0=bearingAng([G.nodes[p0*2],G.nodes[p0*2+1]],[G.nodes[p1*2],G.nodes[p1*2+1]]);
+  const o=Math.max(0,offset||0);
+  const t=firstTurnIndex(path, o);
+  if(t<0){ document.getElementById('nextTurnArrow').textContent='✓'; document.getElementById('nextTurnText').textContent='Arrive at destination'; document.getElementById('nextTurnDist').textContent=''; document.getElementById('nextTurnSub').textContent='You have arrived'; return; }
+  // bearing of the CURRENT travel direction (from where we are toward t)
+  const cur = path[Math.min(o+1, path.length-1)];
+  const pA=path[o], pB=cur;
+  const b0=bearingAng([G.nodes[pA*2],G.nodes[pA*2+1]],[G.nodes[pB*2],G.nodes[pB*2+1]]);
+  const p1=path[t-1],p2=path[t], p3=path[Math.min(t+1,path.length-1)];
   const b1=bearingAng([G.nodes[p1*2],G.nodes[p1*2+1]],[G.nodes[p2*2],G.nodes[p2*2+1]]);
-  const dg=(b1-b0+540)%360-180;
-  const arrow=Math.abs(dg)<25?'↑':dg<0?'←':'→';
-  const turn=Math.abs(dg)<25?'Continue':(dg<-25&&dg>-155)?'Turn left':(dg>25&&dg<155)?'Turn right':'U-turn';
+  const b2=bearingAng([G.nodes[p2*2],G.nodes[p2*2+1]],[G.nodes[p3*2],G.nodes[p3*2+1]]);
+  // turn severity at the junction
+  const dgTurn=(b2-b1+540)%360-180;
+  // overall direction from our heading to the turn
+  const dgHead=(b1-b0+540)%360-180;
+  let arrow='↑', turn='Continue';
+  if(Math.abs(dgHead)>=25 && Math.abs(dgHead)<155){
+    turn = dgHead<0 ? 'Turn left' : 'Turn right';
+    arrow = dgHead<0 ? '←' : '→';
+  } else if(Math.abs(dgHead)>=155){ turn='Make a U-turn'; arrow='⟲'; }
+  else { turn='Continue'; arrow='↑'; }
   document.getElementById('nextTurnArrow').textContent=arrow;
   let nm=edgeNameOf(p1,p2);
   const nxtNamed=nextNamedRoad(path, t);
