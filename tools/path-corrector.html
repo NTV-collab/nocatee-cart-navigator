@@ -608,12 +608,11 @@ function resetMapRotation(){
 }
 function setYouHeading(deg){
   try{
-    // plugin: smooth map bearing rotation (heading-up) in drive mode
+    // ALWAYS rotate the arrow to the heading so it visibly turns with you
+    const el=youMarker&&youMarker.getElement(); if(el){ const d=el.querySelector('div'); if(d) d.style.transform='rotate('+Math.round(deg)+'deg)'; }
+    // drive mode: also rotate the map heading-up via plugin for smooth nav
     if(driveMode && typeof map.setBearing==='function'){
       try{ map.setBearing(deg); }catch(e){}
-    } else {
-      // rotate just the arrow (map stays north-up)
-      const el=youMarker&&youMarker.getElement(); if(el){ const d=el.querySelector('div'); if(d) d.style.transform='rotate('+Math.round(deg)+'deg)'; }
     }
   }catch(e){}
 }
