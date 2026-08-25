@@ -595,9 +595,10 @@ function ensureWatch(){
 let lastYouLat=null,lastYouLng=null;
 function makeYouMarker(lat,lng,deg){
   if(!map.getPane('youPane')){ map.createPane('youPane'); map.getPane('youPane').style.zIndex=800; map.getPane('youPane').style.pointerEvents='none'; }
-  const svg='<svg width="36" height="46" viewBox="0 0 36 46" style="filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))"><path d="M18 1 L31 19 L22 19 L22 45 L14 45 L14 19 L5 19 Z" fill="#173a6e" stroke="#ffffff" stroke-width="3"/></svg>';
-  const html='<div style="width:36px;height:46px;transform:rotate('+deg+'deg);transform-origin:50% 50%">'+svg+'</div>';
-  const ic=L.divIcon({className:'',html, iconSize:[36,46], iconAnchor:[18,23]});
+  // user-provided chevron arrow (transparent PNG), rotates to heading
+  const ARROW_URL='https://d2ol7oe51mr4n9.cloudfront.net/user_3GMMpPAbADd1bMVZfaXlzG5p6dM/48009bc8-b78c-460c-b050-eb6c5baf3e62.png';
+  const html='<div style="width:52px;height:56px;transform:rotate('+deg+'deg);transform-origin:50% 50%;filter:drop-shadow(0 2px 4px rgba(0,0,0,.4))"><img src="'+ARROW_URL+'" style="width:100%;height:100%;object-fit:contain"/></div>';
+  const ic=L.divIcon({className:'',html, iconSize:[52,56], iconAnchor:[26,20]});
   const m=L.marker([lat,lng],{icon:ic,interactive:false,zIndexOffset:1000,pane:'youPane'}).addTo(map);
   return m;
 }
