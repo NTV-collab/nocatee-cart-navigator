@@ -1164,10 +1164,14 @@ function requestLocation(force){
   if(!navigator.geolocation){ setStatus('Location not supported on this device.'); return; }
   navigator.geolocation.getCurrentPosition(pos=>{
     startPt={lat:pos.coords.latitude,lng:pos.coords.longitude};
+    try{ resetMapRotation(); }catch(e){}
+    if(!youMarker){ youMarker=makeYouMarker(pos.coords.latitude,pos.coords.longitude,pos.coords.heading||0); }
+    else { youMarker.setLatLng([pos.coords.latitude,pos.coords.longitude]); if(pos.coords&&pos.coords.heading!=null){ try{setYouHeading(pos.coords.heading);}catch(e){} } }
+    lastYouLat=pos.coords.latitude; lastYouLng=pos.coords.longitude;
     const ls=document.getElementById('startPtLabel'); if(ls){ ls.textContent='From · Your location'; ls.style.display='inline'; }
     const note=document.getElementById('locNote'); if(note) note.style.display='none';
     setStatus('Location found — routing from your position.');
-    map.setView([startPt.lat,startPt.lng], driveZoom());
+    map.setView([pos.coords.latitude,pos.coords.longitude], driveMode?driveZoom():16, {animate:true});
     const rsv2=document.getElementById('residentStartVal'); if(rsv2) rsv2.textContent='Your location';
   }, err=>{
     if(force) setStatus('Location blocked. Enable it in your browser settings, then tap Allow/Recenter.', true);
