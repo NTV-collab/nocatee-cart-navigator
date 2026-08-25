@@ -125,6 +125,13 @@
     <button id="drawFinish" style="background:#0099ba;color:#fff;border:0;border-radius:999px;padding:5px 10px;font:600 11px Outfit">Finish trail</button>
     <button id="drawCancel" style="background:#7a929b;color:#fff;border:0;border-radius:999px;padding:5px 10px;font:600 11px Outfit">Cancel</button>
   </div>
+  <div class="mode" style="margin-top:8px"><button id="auditMode">Audit drawn paths</button></div>
+  <div id="auditList" style="display:none;max-height:170px;overflow:auto;font-size:11px;margin-top:6px"></div>
+  <div id="auditRename" style="display:none;gap:6px;margin-top:6px;align-items:center">
+    <input id="auditNameInput" placeholder="New name" style="flex:1;min-width:90px;border:1px solid #dbe3e5;border-radius:8px;padding:5px 8px;font:600 12px Outfit;color:#00364a"/>
+    <select id="auditNamePick" style="border:1px solid #dbe3e5;border-radius:8px;padding:4px;font:600 11px Outfit;color:#00364a;max-width:120px"><option value="">Group with…</option></select>
+    <button id="auditApply" style="background:#0099ba;color:#fff;border:0;border-radius:999px;padding:6px 12px;font:700 11px Outfit">Rename</button>
+  </div>
   <button id="export" disabled>Export corrected graph.json</button>
   <div class="stat" id="stat">loading…</div>
   <div class="legend">
@@ -1087,6 +1094,107 @@ function enterDev(){
     try{ drawGapMarkers&&drawGapMarkers(); }catch(e){}
   }).catch(e=>{ try{setStatus('Graph load failed: '+e.message);}catch(_){}});
 }
+
+// ---- Audit drawn paths ----
+let auditSel=[]; // selected edge ids of current trail
+let auditTrails=[];
+function findDrawnTrails(){
+  if(!G||!G.nodes) return [];
+  const N=G.nodes.length/2;
+  // drawn = edges touching the appended node band (nodes >= N-80) or in-session added
+  const band=Math.max(0,N-120);
+  const trails=[];
+  const seen=new Set();
+  for(let i=0;i<G.edgesA.length;i++){
+    const a=G.edgesA[i], b=G.edgesB[i];
+    if(a>=band||b>=band){
+      if(seen.has(i)) continue;
+      // gather the connected run of drawn edges
+      const run=[i]; seen.add(i);
+      // simple: just list each drawn edge individually with its endpoints
+    }
+  }
+  // group drawn edges into connected chains
+  const e2map={};
+  for(let i=0;i<G.edgesA.length;i++){
+    const a=G.edgesA[i], b=G.edgesB[i];
+    if(a>=band||b>=band){ e2map[i]=[a,b]; }
+  }
+  const byNode={};
+  Object.keys(e2map).forEach(k=>{ const [a,b]=e2map[k]; (byNode[a]=byNode[a]||[]).push(+k); (byNode[b]=byNode[b]||[]).push(+k); });
+  const used=new Set();
+  Object.keys(e2map).forEach(k=>{
+    if(used.has(+k)) return;
+    const chain=[]; const q=[+k]; used.add(+k);
+    while(q.length){ const e=q.pop(); chain.push(e); const [a,b]=e2map[e];
+      (byNode[a]||[]).forEach(n=>{ if(!used.has(n)){ used.add(n); q.push(n);} });
+      (byNode[b]||[]).forEach(n=>{ if(!used.has(n)){ used.add(n); q.push(n);} });
+    }
+    trails.push(chain);
+  });
+  return trails;
+}
+function renderAudit(){
+  const box=document.getElementById('auditList');
+  auditTrails=findDrawnTrails();
+  box.innerHTML='<b>Drawn paths: '+auditTrails.length+'</b><br/>'+
+    auditTrails.map((chain,i)=>{
+      const e0=chain[0]; const a=G.edgesA[e0], b=G.edgesB[e0];
+      const lat=(G.nodes[a*2]+G.nodes[b*2])/2, lng=(G.nodes[a*2+1]+G.nodes[b*2+1])/2;
+      const nm=G.edgesNameIdx[e0]>=0?G.names[G.edgesNameIdx[e0]]:'(unnamed)';
+      return `<button data-a="${i}" style="display:block;width:100%;text-align:left;margin:2px 0;background:#f6f4ee;color:#2e5562;border:1px solid #ece8de;border-radius:8px;padding:3px 6px;font-size:11px">${nm} · ${chain.length} seg · ${lat.toFixed(4)},${lng.toFixed(4)}</button>`;
+    }).join('');
+  box.querySelectorAll('button').forEach(btn=>btn.addEventListener('click',()=>{
+    const i=+btn.dataset.a;
+    selectAudit(i);
+  }));
+}
+function selectAudit(i){
+  auditSel=auditTrails[i]||[];
+  const box=document.getElementById('auditRename'); box.style.display='flex';
+  const inp=document.getElementById('auditNameInput');
+  const e0=auditSel[0];
+  inp.value=(e0!==undefined&&G.edgesNameIdx[e0]>=0)?G.names[G.edgesNameIdx[e0]]:'';
+  setStatus('Selected drawn path with '+auditSel.length+' segments — type a name or group with an existing one.');
+  fillAuditNamePick();
+  // highlight
+  if(auditLayer) map.removeLayer(auditLayer);
+  auditLayer=L.layerGroup().addTo(map);
+  auditSel.forEach(e=>{ const a=G.edgesA[e],b=G.edgesB[e];
+    L.polyline([[G.nodes[a*2],G.nodes[a*2+1]],[G.nodes[b*2],G.nodes[b*2+1]]],{color:'#ff9800',weight:5,opacity:.95}).addTo(auditLayer);
+  });
+}
+function fillAuditNamePick(){
+  const sel=document.getElementById('auditNamePick');
+  sel.innerHTML='<option value="">Group with…</option>';
+  (G.names||[]).forEach((nm,i)=>{ const o=document.createElement('option'); o.value=i; o.textContent=nm; sel.appendChild(o); });
+}
+function applyAuditName(){
+  const inp=document.getElementById('auditNameInput');
+  const sel=document.getElementById('auditNamePick');
+  let nm=inp.value.trim();
+  if(!nm && sel.value!==''){ nm=G.names[+sel.value]; }
+  if(!nm){ setStatus('Enter a name or pick one to group with.'); return; }
+  if(!auditSel.length){ setStatus('Select a drawn path first.'); return; }
+  // get or create name index
+  let idx=G.names.indexOf(nm);
+  if(idx<0){ idx=G.names.length; G.names.push(nm); }
+  let total=0;
+  auditSel.forEach(e=>{ G.edgesNameIdx[e]=idx; total++; });
+  setStatus('Named '+total+' segments "'+nm+'" — drawn paths now group under that name.');
+  exportBtn.disabled=false;
+  renderAudit();
+  try{ ensureNetwork(); }catch(e){}
+}
+document.getElementById('auditMode').addEventListener('click',function(){ this.classList.toggle('on');
+  const box=document.getElementById('auditList');
+  const show=this.classList.contains('on');
+  box.style.display=show?'block':'none';
+  document.getElementById('auditRename').style.display='none';
+  if(show) renderAudit();
+});
+document.getElementById('auditApply').addEventListener('click',applyAuditName);
+let auditLayer=null;
 document.getElementById('gapsMode').addEventListener('click',function(){ this.classList.toggle('on');
   gapMode=this.classList.contains('on');
   const lst=document.getElementById('gapsList'); lst.style.display=gapMode?'block':'none';
