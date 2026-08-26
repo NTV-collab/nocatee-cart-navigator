@@ -554,6 +554,13 @@ function ensureWatch(){
     if(!youMarker){ youMarker=makeYouMarker(lat,lng,0); }
     else youMarker.setLatLng([lat,lng]);
     if(pos.coords&&pos.coords.heading!=null){ setYouHeading(pos.coords.heading); } else { rotateYouMarker(lat,lng); }
+    // follow the user in Map view too (soft, so the arrow stays centered while walking)
+    if(!driveMode){
+      if(!lastFollowT||hav([lastFollowT[0],lastFollowT[1]],[lat,lng])>25){
+        map.setView([lat,lng], Math.max(map.getZoom(),15), {animate:true});
+        lastFollowT=[lat,lng];
+      }
+    }
     if(driveMode&&drivePath){
       // deviation detection
       const dMin=nearestDistOnRoute(drivePath,lat,lng);
