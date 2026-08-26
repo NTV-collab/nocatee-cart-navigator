@@ -1209,6 +1209,8 @@ function requestLocation(force){
     setStatus('Location found — routing from your position.');
     map.setView([pos.coords.latitude,pos.coords.longitude], driveMode?driveZoom():16, {animate:true});
     const rsv2=document.getElementById('residentStartVal'); if(rsv2) rsv2.textContent='Your location';
+    // ensure live tracking starts after a manual fix (start the watcher)
+    try{ ensureWatch(); }catch(e){}
   }, err=>{
     if(force) setStatus('Location blocked. Enable it in your browser settings, then tap Allow/Recenter.', true);
     const note=document.getElementById('locNote'); if(note) note.style.display='block';
