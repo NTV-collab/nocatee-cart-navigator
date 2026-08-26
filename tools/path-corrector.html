@@ -670,8 +670,13 @@ function rotateYouMarker(lat,lng){
   if(!youMarker) return;
   if(lastYouLat!==null){
     const dLat=lat-lastYouLat, dLng=lng-lastYouLng;
-    const deg=Math.round(Math.atan2(dLng*Math.cos(lat*Math.PI/180), dLat)*180/Math.PI);
-    const el=youMarker.getElement(); if(el){ const d=el.querySelector('div'); if(d) d.style.transform='rotate('+deg+'deg)'; }
+    const moved=Math.sqrt(dLat*dLat + dLng*dLng);
+    if(moved>0.00002){ // ~2m: ignore GPS jitter
+      const deg=Math.round(Math.atan2(dLng*Math.cos(lat*Math.PI/180), dLat)*180/Math.PI);
+      const el=youMarker.getElement(); if(el){ const d=el.querySelector('div'); if(d) d.style.transform='rotate('+deg+'deg)'; }
+      // rotate the map heading-up from movement bearing too (walking-friendly)
+      rotateMapTo(deg);
+    }
   }
   lastYouLat=lat; lastYouLng=lng;
 }
