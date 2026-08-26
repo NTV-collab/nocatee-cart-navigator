@@ -479,6 +479,8 @@ function exitDrive(){
   document.getElementById('tripBar').style.display='none';
   const rb=document.getElementById('residentBar'); if(rb) rb.style.display='flex';
   if(watchId!==null){ navigator.geolocation.clearWatch(watchId); watchId=null; }
+  if(refixTimer){ clearInterval(refixTimer); refixTimer=null; }
+  releaseWakeLock(); wakeReqs=0;
   if(youMarker){ map.removeLayer(youMarker); youMarker=null; }
 }
 function bearingAng(a,b){
@@ -533,7 +535,7 @@ function closeTurnOverlay(){
 }
 document.getElementById('turnClose').addEventListener('click',closeTurnOverlay);
 document.getElementById('nextTurn').addEventListener('click',openTurnOverlay);
-let watchId=null, youMarker=null, progIdx=0, currentDestPt=null;
+let watchId=null, youMarker=null, progIdx=0, currentDestPt=null, wakeLock=null, wakeReqs=0, refixTimer=null, lastFixTs=0;
 let rerouteGuard=false;
 function resolveDestPt(){
   if(destPt) return destPt;
@@ -546,9 +548,38 @@ function resolveDestPt(){
   return null;
 }
 
+function armRefixTimer(){
+  if(refixTimer) clearInterval(refixTimer);
+  refixTimer=setInterval(()=>{
+    const idle=Date.now()-lastFixTs;
+    if(idle>25000 && navigator.geolocation){
+      try{ navigator.geolocation.getCurrentPosition(pos=>{
+        lastFixTs=Date.now();
+        const lat=pos.coords.latitude, lng=pos.coords.longitude;
+        if(youMarker) youMarker.setLatLng([lat,lng]);
+        if(pos.coords&&pos.coords.heading!=null){ setYouHeading(pos.coords.heading); } else { rotateYouMarker(lat,lng); }
+        if(!driveMode){ if(!lastFollowT||hav([lastFollowT[0],lastFollowT[1]],[lat,lng])>25){ map.setView([lat,lng], Math.max(map.getZoom(),15), {animate:true}); lastFollowT=[lat,lng]; } }
+      },()=>{}, {enableHighAccuracy:true, timeout:8000, maximumAge:20000}); }catch(e){}
+    }
+  }, 25000);
+}
+function requestWakeLock(){
+  try{
+    if(!navigator.wakeLock){ return; }
+    if(wakeLock) return;
+    navigator.wakeLock.request('screen').then(lock=>{ wakeLock=lock; }).catch(()=>{});
+  }catch(e){}
+}
+function releaseWakeLock(){
+  try{ if(wakeLock){ wakeLock.release(); wakeLock=null; } }catch(e){}
+}
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible' && wakeReqs>0){ try{ if(wakeLock){ wakeLock.release(); wakeLock=null; } }catch(e){} requestWakeLock(); } });
 function ensureWatch(){
+  if(watchId===null){ wakeReqs++; requestWakeLock(); }
+  armRefixTimer();   // always arm the fallback re-fix timer
   if(watchId!==null||!navigator.geolocation) return;
-  watchId=navigator.geolocation.watchPosition(pos=>{
+  // mark a fix as fresh when one arrives
+  watchId=navigator.geolocation.watchPosition(pos=>{ lastFixTs=Date.now();
     const lat=pos.coords.latitude, lng=pos.coords.longitude;
     // move "you" marker
     if(!youMarker){ youMarker=makeYouMarker(lat,lng,0); }
