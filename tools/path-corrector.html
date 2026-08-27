@@ -8,6 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <link href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-rotate@0.2.8/dist/leaflet-rotate-src.js"></script>
 <style>
   html,body{margin:0;height:100%;overflow:hidden;font-family:"Outfit",ui-sans-serif,system-ui,sans-serif;background:#f6f4ee;color:#00364a}
   #map{position:fixed;inset:0;background:#efece2;height:100dvh;width:100%}
@@ -222,7 +223,9 @@ window.__drawWire=true;
 let EV_NAMES=new Set(); // loaded from ev_roads.json (OSM residential-classified)
 let G=null, compOf=null, nComp=0;
 
-const map = L.map("map",{zoomSnap:.5}).setView([30.10,-81.42],13);
+const map = L.map("map",{zoomSnap:.5, rotate:true, bearing:0}).setView([30.10,-81.42],13);
+// start live location as soon as the page initializes (icon appears the moment GPS resolves)
+setTimeout(()=>{ try{ requestWakeLock(); ensureWatch(); }catch(e){} }, 500);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"&copy; OpenStreetMap contributors",maxZoom:19}).addTo(map);
 let satLayer=null, streetBaseTile=null;
 const SAT_URL='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
@@ -640,7 +643,7 @@ function makeYouMarker(lat,lng,deg){
   const m=L.marker([lat,lng],{icon:ic,interactive:false,zIndexOffset:1000,pane:'youPane'}).addTo(map);
   return m;
 }
-function resetMapRotation(){ /* rotation disabled */ }
+function resetMapRotation(){ try{ if(typeof map.setBearing==='function') map.setBearing(0); }catch(e){} }
 function setYouHeading(deg){
   try{
     const h=Math.round(deg);
@@ -649,7 +652,9 @@ function setYouHeading(deg){
     // map rotation intentionally disabled — stays north-up
   }catch(e){}
 }
-function rotateMapTo(h){ /* rotation intentionally disabled */ }
+function rotateMapTo(h){
+  try{ if(typeof map.setBearing==='function') map.setBearing(h); }catch(e){}
+}
 function resetMapRotationAlt(){ /* rotation disabled */ }
 function rotateYouMarker(lat,lng){
   if(!youMarker) return;
