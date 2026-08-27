@@ -486,7 +486,7 @@ function bearingAng(a,b){
   return Math.atan2(y,x)*180/Math.PI;
 }
 function exitDrive(){
-  resetMapRotation();
+  // keep heading-up engaged (DO NOT reset to north) so it follows in map view too
   try{ voiceStop(); }catch(e){}
   driveMode=false;
   document.getElementById('driveUI').style.display='none';
@@ -768,6 +768,8 @@ function setYouHeading(deg,src){
     if(src!=='compass') NAV.gpsTs=Date.now();
     NAV.heading=h;
     navApplyPuck();
+    // heading-up engages on any real heading — map view (walking) AND drive
+    if(!NAV.up){ try{ setHeadingUp(true); }catch(e){} }
     rotateMapTo(h);
   }catch(e){}
 }
