@@ -635,9 +635,9 @@ let lastYouLat=null,lastYouLng=null;
 function makeYouMarker(lat,lng,deg){
   if(!map.getPane('youPane')){ map.createPane('youPane'); map.getPane('youPane').style.zIndex=800; map.getPane('youPane').style.pointerEvents='none'; }
   // user-provided chevron arrow (transparent PNG), rotates to heading
-  const ARROW_URL='https://d2ol7oe51mr4n9.cloudfront.net/user_3GMMpPAbADd1bMVZfaXlzG5p6dM/48009bc8-b78c-460c-b050-eb6c5baf3e62.png';
-  const html='<div style="width:34px;height:36px;transform:rotate('+deg+'deg);transform-origin:50% 50%;filter:drop-shadow(0 1px 3px rgba(0,0,0,.4))"><img src="'+ARROW_URL+'" style="width:100%;height:100%;object-fit:contain"/></div>';
-  const ic=L.divIcon({className:'',html, iconSize:[34,36], iconAnchor:[17,13]});
+  const ARROW_URL='https://d2ol7oe51mr4n9.cloudfront.net/user_3GMMpPAbADd1bMVZfaXlzG5p6dM/4f430b6c-1e13-4e3c-89a1-58d491926113.png';
+  const html='<div style="width:36px;height:38px;transform:rotate('+deg+'deg);transform-origin:50% 50%;filter:drop-shadow(0 1px 3px rgba(0,0,0,.4))"><img src="'+ARROW_URL+'" style="width:100%;height:100%;object-fit:contain"/></div>';
+  const ic=L.divIcon({className:'',html, iconSize:[36,38], iconAnchor:[18,34]});
   const m=L.marker([lat,lng],{icon:ic,interactive:false,zIndexOffset:1000,pane:'youPane'}).addTo(map);
   return m;
 }
@@ -656,15 +656,12 @@ function setYouHeading(deg){
 }
 function rotateMapTo(h){
   try{
-    const ov=map.getPane('overlayPane'), mr=map.getPane('markerPane');
-    const deg=-h; // map rotates opposite so travel points up
-    const tf='rotate('+deg+'deg)';
-    if(ov && ov.style.transform!==tf){ ov.style.transform=tf; }
-    if(mr && mr.style.transform!==tf){ mr.style.transform=tf; }
+    // use the leaflet-rotate plugin's renderer rotation for real canvas rotation
+    if(typeof map.setBearing==='function'){ map.setBearing(h); }
   }catch(e){}
 }
 function resetMapRotationAlt(){
-  try{ const ov=map.getPane('overlayPane'); if(ov) ov.style.transform=''; const mr=map.getPane('markerPane'); if(mr) mr.style.transform=''; }catch(e){}
+  try{ if(typeof map.resetBearing==='function'){ map.resetBearing(); } }catch(e){}
 }
 function rotateYouMarker(lat,lng){
   if(!youMarker) return;
