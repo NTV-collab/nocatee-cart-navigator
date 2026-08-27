@@ -10,7 +10,16 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
   html,body{margin:0;height:100%;overflow:hidden;font-family:"Outfit",ui-sans-serif,system-ui,sans-serif;background:#f6f4ee;color:#00364a}
-  #map{position:fixed;inset:0;background:#efece2;height:100dvh;width:100%}
+  #mapWrap{position:fixed;inset:0;overflow:hidden;background:#efece2;height:100dvh;width:100%}
+  #map{position:absolute;left:0;top:0;background:#efece2;height:100%;width:100%;transform-origin:50% 50%;will-change:transform}
+  body.navup #map{transition:transform .28s linear}
+  #navAttrib{display:none;position:fixed;left:6px;bottom:2px;z-index:1150;font:400 10px/1.3 system-ui,sans-serif;color:#4a5b60;background:rgba(255,255,255,.72);padding:1px 6px;border-radius:6px;pointer-events:none}
+  body.navup #navAttrib{display:block}
+  #compassBtn{position:fixed;right:12px;bottom:120px;z-index:1150;width:46px;height:46px;border-radius:999px;border:1px solid #cfdadd;background:rgba(255,255,255,.96);box-shadow:0 3px 12px rgba(0,54,74,.18);display:none;align-items:center;justify-content:center;padding:0;cursor:pointer}
+  #compassBtn.on{display:flex}
+  #compassRose{width:26px;height:26px;transform-origin:50% 50%;transition:transform .28s linear}
+  #voiceBtn{position:fixed;right:12px;bottom:174px;z-index:1150;width:46px;height:46px;border-radius:999px;border:1px solid #0099ba;background:rgba(230,243,246,.98);box-shadow:0 3px 12px rgba(0,54,74,.18);display:none;align-items:center;justify-content:center;padding:0;font-size:20px;line-height:1;cursor:pointer}
+  #voiceBtn.on{display:flex}
   #topbar{position:fixed;top:0;left:0;right:0;height:calc(56px + env(safe-area-inset-top));padding:env(safe-area-inset-top) 14px 0;box-sizing:border-box;z-index:1100;display:flex;align-items:center;gap:10px;background:#00364a;color:#fff;box-shadow:0 2px 10px rgba(0,54,74,.25)}
   #brand{display:flex;align-items:center;gap:10px;min-width:0}
   #badge{width:34px;height:34px;border-radius:50%;background:#0099ba;color:#fff;font-weight:700;font-size:15px;display:flex;align-items:center;justify-content:center;flex:none}
@@ -60,7 +69,10 @@
 </style>
 </head>
 <body>
-<div id="map"></div>
+<div id="mapWrap"><div id="map"></div></div>
+<div id="navAttrib">&copy; OpenStreetMap contributors</div>
+<button id="compassBtn" title="North up / Heading up"><svg id="compassRose" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="14" fill="#fff" stroke="#cfdadd"/><polygon points="16,3 21,17 16,14 11,17" fill="#d3352b"/><polygon points="16,29 11,15 16,18 21,15" fill="#00364a"/></svg></button>
+<button id="voiceBtn" title="Voice guidance">&#128266;</button>
 <div id="topbar">
   <div id="brand">
     <div id="badge">CN</div>
@@ -475,6 +487,7 @@ function bearingAng(a,b){
 }
 function exitDrive(){
   resetMapRotation();
+  try{ voiceStop(); }catch(e){}
   driveMode=false;
   document.getElementById('driveUI').style.display='none';
   document.getElementById('tripBar').style.display='none';
@@ -490,6 +503,17 @@ function bearingAng(a,b){
   const x=Math.cos(toR(a[0]))*Math.sin(toR(b[0]))-Math.sin(toR(a[0]))*Math.cos(toR(b[0]))*Math.cos(toR(b[1]-a[1]));
   return Math.atan2(y,x)*180/Math.PI;
 }
+/* Single source of truth for maneuver wording, used by the drive card, the printed
+   turn list and the voice prompts, so the three can never disagree.
+   dg = signed angle between the leg ARRIVING at the junction and the leg LEAVING it
+   (negative = left). This is the real turn angle. */
+function classifyTurn(dg){
+  const a=Math.abs(dg);
+  if(a>=155) return {turn:'Make a U-turn', arrow:'⟲'};
+  if(a>=45)  return dg<0?{turn:'Turn left',arrow:'←'}:{turn:'Turn right',arrow:'→'};
+  if(a>=25)  return dg<0?{turn:'Bear left',arrow:'↖'}:{turn:'Bear right',arrow:'↗'};
+  return {turn:'Continue', arrow:'↑'};
+}
 function buildTurnList(){
   const path=drivePath; if(!path||path.length<2){ return []; }
   const turns=[];
@@ -503,9 +527,8 @@ function buildTurnList(){
       const b0=bearingAng([G.nodes[path[k-1]*2],G.nodes[path[k-1]*2+1]],[G.nodes[path[k]*2],G.nodes[path[k]*2+1]]);
       const b1=bearingAng([G.nodes[path[k]*2],G.nodes[path[k]*2+1]],[G.nodes[path[k+1]*2],G.nodes[path[k+1]*2+1]]);
       const dg=Math.round((b1-b0+540)%360-180);
-      let turn='Continue', arrow='↑';
-      if(Math.abs(dg)>=25){ turn = dg<0?'Turn left':'Turn right'; arrow = dg<0?'←':'→'; }
-      if(Math.abs(dg)>155){ turn='Make a U-turn'; arrow='⟲'; }
+      const cls=classifyTurn(dg);
+      const turn=cls.turn, arrow=cls.arrow;
       turns.push({km:Math.round(cum), text:nm, turn, arrow});
     }
     if(nm!==prevName){ prevName=nm; segStart=cum; }
@@ -558,7 +581,7 @@ function armRefixTimer(){
         lastFixTs=Date.now();
         const lat=pos.coords.latitude, lng=pos.coords.longitude;
         if(youMarker) youMarker.setLatLng([lat,lng]);
-        if(pos.coords&&pos.coords.heading!=null){ setYouHeading(pos.coords.heading); } else { rotateYouMarker(lat,lng); }
+        if(pos.coords&&pos.coords.heading!=null&&!isNaN(pos.coords.heading)&&(pos.coords.speed==null||pos.coords.speed>0.7)){ setYouHeading(pos.coords.heading,'gps'); } else { rotateYouMarker(lat,lng); }
         if(!driveMode){ if(!lastFollowT||hav([lastFollowT[0],lastFollowT[1]],[lat,lng])>25){ map.setView([lat,lng], Math.max(map.getZoom(),15), {animate:true}); lastFollowT=[lat,lng]; } }
       },()=>{}, {enableHighAccuracy:true, timeout:8000, maximumAge:20000}); }catch(e){}
     }
@@ -582,13 +605,15 @@ function ensureWatch(){
   // mark a fix as fresh when one arrives
   watchId=navigator.geolocation.watchPosition(pos=>{ lastFixTs=Date.now();
     const lat=pos.coords.latitude, lng=pos.coords.longitude;
+    window.__lastFix={lat:lat,lng:lng,ts:lastFixTs};   // used by voice guidance for exact turn distance
     // move "you" marker
     if(!youMarker){ youMarker=makeYouMarker(lat,lng,0); }
     else youMarker.setLatLng([lat,lng]);
-    if(pos.coords&&pos.coords.heading!=null){ setYouHeading(pos.coords.heading); } else { rotateYouMarker(lat,lng); }
+    if(pos.coords&&pos.coords.heading!=null&&!isNaN(pos.coords.heading)&&(pos.coords.speed==null||pos.coords.speed>0.7)){ setYouHeading(pos.coords.heading,'gps'); } else { rotateYouMarker(lat,lng); }
     // follow the user in Map view too (soft, so the arrow stays centered while walking)
     if(!driveMode){
-      if(!lastFollowT||hav([lastFollowT[0],lastFollowT[1]],[lat,lng])>25){
+      if(NAV.up){ map.setView([lat,lng], Math.max(map.getZoom(),15), {animate:false}); lastFollowT=[lat,lng]; }
+      else if(!lastFollowT||hav([lastFollowT[0],lastFollowT[1]],[lat,lng])>25){
         map.setView([lat,lng], Math.max(map.getZoom(),15), {animate:true});
         lastFollowT=[lat,lng];
       }
@@ -599,6 +624,7 @@ function ensureWatch(){
       if(dMin.d>30 && !rerouteGuard){
         rerouteGuard=true;
         showRerouteBadge();
+        try{ voiceReroute(); }catch(e){}
         const dest=resolveDestPt();
         const fromIdx=cartNearest(lat,lng);
         const destIdx=dest&&dest.lat?cartNearest(dest.lat,dest.lng):null;
@@ -624,7 +650,8 @@ function ensureWatch(){
       // fade travelled part: redraw route from current idx
       if(idx>1){ drawRouteFrom(drivePath, idx); }
       // follow softly: only recenter when we've moved noticeably (>25m) so it doesn't jitter
-      if(!lastFollowT||hav([lastFollowT[0],lastFollowT[1]],[lat,lng])>25){
+      // (in heading-up mode we recenter on every fix so the puck stays pinned to the pivot)
+      if(NAV.up || !lastFollowT || hav([lastFollowT[0],lastFollowT[1]],[lat,lng])>25){
         map.setView([lat,lng], driveZoom(), {animate:false});
         lastFollowT=[lat,lng];
       }
@@ -642,31 +669,166 @@ function makeYouMarker(lat,lng,deg){
   const m=L.marker([lat,lng],{icon:ic,interactive:false,zIndexOffset:1000,pane:'youPane'}).addTo(map);
   return m;
 }
-function resetMapRotation(){ /* rotation disabled */ }
-function setYouHeading(deg){
+/* =========================================================================
+   HEADING-UP MAP ROTATION  (visual layer only)
+   The whole Leaflet container is CSS-rotated around the "you" puck, so tiles,
+   the highlighted route and every marker turn together, exactly like Google /
+   Apple / Waze navigation. Nothing here touches the path graph, routing,
+   snapping or the developer tools — Leaflet's own coordinate system is never
+   modified. While heading-up is active the container is enlarged to a square
+   so no blank corners appear, and map dragging is parked (the view auto-
+   follows anyway); tapping the compass returns to north-up and restores
+   normal panning.
+   ========================================================================= */
+const NAV={
+  up:false,           // heading-up active?
+  bearing:0,          // CONTINUOUS bearing (not wrapped) so CSS always takes the short way
+  heading:0,          // last good heading, 0..360
+  gpsTs:0,            // when we last had a movement-derived heading
+  offset:0            // px the puck is pushed below centre while driving
+};
+function navNorm(a){ a=a%360; return a<0?a+360:a; }
+function navShort(from,to){ let d=(to-from)%360; if(d>180)d-=360; if(d<-180)d+=360; return d; }
+function navMapEl(){ return document.getElementById('map'); }
+
+// size the container: a square big enough that rotation never shows blank corners
+function navResize(){
+  const el=navMapEl(); if(!el) return;
+  const w=window.innerWidth, h=window.innerHeight;
+  if(NAV.up){
+    NAV.offset=Math.round(Math.min(h*0.14,110));
+    const side=Math.ceil(Math.hypot(w,h)+NAV.offset*2+40);
+    el.style.width=side+'px'; el.style.height=side+'px';
+    el.style.left=Math.round((w-side)/2)+'px';
+    el.style.top=Math.round((h-side)/2)+'px';
+  }else{
+    NAV.offset=0;
+    el.style.width='100%'; el.style.height='100%'; el.style.left='0'; el.style.top='0';
+  }
+  try{ map.invalidateSize(false); }catch(e){}
+  navApply();
+}
+
+// paint the current bearing onto the map, the puck and the compass rose
+function navApply(){
+  const el=navMapEl(); if(!el) return;
+  const b=NAV.up?NAV.bearing:0;
+  el.style.transform='translateY('+(NAV.up?NAV.offset:0)+'px) rotate('+(-b).toFixed(1)+'deg)';
+  const rose=document.getElementById('compassRose');
+  if(rose) rose.style.transform='rotate('+(-b).toFixed(1)+'deg)';
+  navApplyPuck();
+}
+// the puck points at the true heading in SCREEN space: heading minus map bearing
+// (heading-up => it simply points straight up, like every nav app)
+function navApplyPuck(){
   try{
-    const h=Math.round(deg);
-    // rotate the arrow so it points the way you face (absolute)
-    const el=youMarker&&youMarker.getElement(); if(el){ const d=el.querySelector('div'); if(d) d.style.transform='rotate('+h+'deg)'; }
-    // map rotation intentionally disabled — stays north-up
+    const m=youMarker&&youMarker.getElement(); if(!m) return;
+    const d=m.querySelector('div'); if(!d) return;
+    const b=NAV.up?navNorm(NAV.bearing):0;
+    d.style.transform='rotate('+Math.round(navNorm(NAV.heading-b))+'deg)';
   }catch(e){}
 }
-function rotateMapTo(h){ /* rotation disabled */ }
-function resetMapRotationAlt(){ /* rotation disabled */ }
+// feed a new heading to the map (smoothed; CSS transition does the easing)
+function rotateMapTo(h){
+  if(h==null||isNaN(h)) return;
+  if(!NAV.up){ navApplyPuck(); return; }
+  const d=navShort(navNorm(NAV.bearing),navNorm(h));
+  if(Math.abs(d)<2){ navApplyPuck(); return; }   // dead-band kills GPS jitter
+  NAV.bearing+=d;
+  navApply();
+}
+function setHeadingUp(on){
+  on=!!on;
+  if(NAV.up===on){ return; }
+  NAV.up=on;
+  document.body.classList.toggle('navup',on);
+  const btn=document.getElementById('compassBtn'); if(btn){ btn.classList.add('on'); btn.style.background=on?'rgba(230,243,246,.98)':'rgba(255,255,255,.96)'; btn.style.borderColor=on?'#0099ba':'#cfdadd'; }
+  if(on){
+    NAV.bearing=NAV.heading||0;
+    try{ map.dragging.disable(); }catch(e){}
+  }else{
+    NAV.bearing=0;
+    try{ map.dragging.enable(); }catch(e){}
+  }
+  navResize();
+  // keep the puck under the rotation centre
+  try{ if(youMarker) map.setView(youMarker.getLatLng(), map.getZoom(), {animate:false}); }catch(e){}
+}
+function toggleHeadingUp(){ setHeadingUp(!NAV.up); }
+function resetMapRotation(){ setHeadingUp(false); }
+function resetMapRotationAlt(){ setHeadingUp(false); }
+
+/* heading sources, in priority order:
+   1. GPS course while actually moving   2. device compass   3. bearing between fixes */
+function setYouHeading(deg,src){
+  try{
+    if(deg==null||isNaN(deg)) return;
+    const h=navNorm(deg);
+    if(src==='compass' && Date.now()-NAV.gpsTs<6000) return; // moving: trust GPS course
+    if(src!=='compass') NAV.gpsTs=Date.now();
+    NAV.heading=h;
+    navApplyPuck();
+    rotateMapTo(h);
+  }catch(e){}
+}
 function rotateYouMarker(lat,lng){
   if(!youMarker) return;
   if(lastYouLat!==null){
     const dLat=lat-lastYouLat, dLng=lng-lastYouLng;
     const moved=Math.sqrt(dLat*dLat + dLng*dLng);
     if(moved>0.00002){ // ~2m: ignore GPS jitter
-      const deg=Math.round(Math.atan2(dLng*Math.cos(lat*Math.PI/180), dLat)*180/Math.PI);
-      const el=youMarker.getElement(); if(el){ const d=el.querySelector('div'); if(d) d.style.transform='rotate('+deg+'deg)'; }
-      // rotate the map heading-up from movement bearing too (walking-friendly)
-      rotateMapTo(deg);
+      const deg=navNorm(Math.atan2(dLng*Math.cos(lat*Math.PI/180), dLat)*180/Math.PI);
+      setYouHeading(deg,'move');
     }
   }
   lastYouLat=lat; lastYouLng=lng;
 }
+window.addEventListener('resize',()=>{ if(NAV.up) navResize(); });
+window.addEventListener('orientationchange',()=>{ setTimeout(()=>{ if(NAV.up) navResize(); },350); });
+document.addEventListener('DOMContentLoaded',()=>{
+  const b=document.getElementById('compassBtn');
+  if(b){ b.classList.add('on'); b.addEventListener('click',function(ev){ ev.preventDefault(); ev.stopPropagation(); toggleHeadingUp(); }); }
+});
+/* Desktop test harness: open the page with ?simnav=1 to drive a fake heading that
+   sweeps 360°, so rotation can be verified on a laptop without a GPS fix.
+   Also exposes navSimHeading(deg) in the console. Never runs unless asked for. */
+function navSimHeading(deg){ setYouHeading(navNorm(deg),'gps'); }
+/* Pointer correction: while the container is rotated, the browser's bounding box no
+   longer matches Leaflet's own pixel space, so taps/pinches would land off-target.
+   We invert our transform here, which keeps clicking, pinch-zoom and the developer
+   path-editing tools pixel-accurate at any bearing. No-op when bearing is 0. */
+(function(){
+  try{
+    const base=L.Map.prototype.mouseEventToContainerPoint;
+    L.Map.prototype.mouseEventToContainerPoint=function(e){
+      if(!NAV.up || this!==map) return base.call(this,e);
+      const el=this.getContainer();
+      const side=el.offsetWidth, sideH=el.offsetHeight;
+      const cx=window.innerWidth/2, cy=window.innerHeight/2+NAV.offset;   // on-screen pivot
+      const dx=e.clientX-cx, dy=e.clientY-cy;
+      const th=-NAV.bearing*Math.PI/180;                                   // applied CSS rotation
+      const cos=Math.cos(th), sin=Math.sin(th);
+      const lx= dx*cos + dy*sin;                                           // inverse rotation
+      const ly=-dx*sin + dy*cos;
+      return new L.Point(lx+side/2, ly+sideH/2);
+    };
+  }catch(e){}
+})();
+(function(){
+  try{
+    if(!/[?&]simnav=1/.test(location.search)) return;
+    let h=0;
+    document.addEventListener('DOMContentLoaded',()=>{
+      setTimeout(()=>{
+        try{
+          if(!youMarker){ const c=map.getCenter(); youMarker=makeYouMarker(c.lat,c.lng,0); }
+          setHeadingUp(true);
+        }catch(e){}
+        setInterval(()=>{ h=(h+6)%360; navSimHeading(h); }, 500);
+      }, 1200);
+    });
+  }catch(e){}
+})();
 function nearestDistOnRoute(path,lat,lng){
   let b=0,bd=1e18;
   for(let i=0;i<path.length;i++){
@@ -696,6 +858,10 @@ function enterDrive(){
   map.setView([sx,sy], driveZoom(), {animate:true});
   lastFollowT=[sx,sy];
   if(!youMarker){ youMarker=makeYouMarker(sx,sy,0); lastYouLat=sx; lastYouLng=sy; }
+  // navigation view: heading-up like Google/Apple/Waze (tap the compass for north-up)
+  try{ tryEnableCompass(); }catch(e){}
+  try{ setHeadingUp(true); }catch(e){}
+  try{ voiceStartRoute(); }catch(e){}   // GO is a user gesture: safe place to unlock speech
   ensureWatch();
 }
 function updateTripInfo(){
@@ -716,11 +882,211 @@ function updateTripInfo(){
   const tm=document.getElementById('tripMeta');
   if(tm) tm.textContent=(meters<1000?Math.round(meters)+' m':(meters/1000).toFixed(1)+' km')+' · '+mins+' min'+(dest&&dest.value?' · '+dest.value:'');
 }
+/* =========================================================================
+   TURN-BY-TURN VOICE GUIDANCE  (Web Speech API)
+   Speaks the maneuver the existing turn engine has already computed — this
+   module never routes, never touches the path graph, the rotation layer or
+   the developer tools. It only listens to updateNextTurn() and talks.
+   Trigger ladder per maneuver: ~200 m ("in 650 feet, turn left onto X"),
+   ~50 m ("in 150 feet, turn left onto X"), and at the turn ("turn left"),
+   plus route start, rerouting and arrival. Each stage fires once per turn.
+   ========================================================================= */
+const VOICE={
+  on:true,
+  unlocked:false,
+  voice:null,
+  turnKey:null,       // identifies the maneuver currently being counted down
+  stages:{},          // which trigger stages already spoke for that maneuver
+  arrived:false,
+  lastSaid:'',
+  lastSaidTs:0,
+  TRIG:[200,50,25]    // metres: far prompt, near prompt, at-the-turn prompt
+};
+try{ VOICE.on = localStorage.getItem('cnVoiceMuted')!=='1'; }catch(e){}
+
+function voicePickVoice(){
+  try{
+    const vs=window.speechSynthesis?speechSynthesis.getVoices():[];
+    if(!vs||!vs.length) return null;
+    const en=vs.filter(v=>/^en(-|_)?US/i.test(v.lang)||/^en/i.test(v.lang));
+    const pref=['Samantha','Google US English','Microsoft Aria','Microsoft Jenny','Alex','Karen'];
+    for(const p of pref){ const hit=en.find(v=>v.name.indexOf(p)>=0); if(hit) return hit; }
+    return en.find(v=>v.localService) || en[0] || vs[0];
+  }catch(e){ return null; }
+}
+if(window.speechSynthesis){
+  try{
+    VOICE.voice=voicePickVoice();
+    speechSynthesis.onvoiceschanged=()=>{ VOICE.voice=voicePickVoice(); };
+  }catch(e){}
+}
+// iOS/Safari only allow speech that descends from a real user gesture — prime it once
+function voiceUnlock(){
+  if(VOICE.unlocked || !window.speechSynthesis) return;
+  try{
+    const u=new SpeechSynthesisUtterance(' ');
+    u.volume=0; if(VOICE.voice) u.voice=VOICE.voice;
+    speechSynthesis.speak(u);
+    VOICE.unlocked=true;
+  }catch(e){}
+}
+document.addEventListener('pointerdown',voiceUnlock,{once:true,capture:true});
+document.addEventListener('touchstart',voiceUnlock,{once:true,capture:true});
+
+function voiceSay(text,interrupt){
+  if(!VOICE.on||!text||!window.speechSynthesis) return;
+  const now=Date.now();
+  if(text===VOICE.lastSaid && now-VOICE.lastSaidTs<6000) return;  // never repeat a phrase back-to-back
+  VOICE.lastSaid=text; VOICE.lastSaidTs=now;
+  try{
+    if(interrupt!==false) speechSynthesis.cancel();   // nav prompts supersede each other
+    const u=new SpeechSynthesisUtterance(text);
+    if(VOICE.voice) u.voice=VOICE.voice;
+    u.lang=(VOICE.voice&&VOICE.voice.lang)||'en-US';
+    u.rate=1.0; u.pitch=1.0; u.volume=1.0;
+    speechSynthesis.speak(u);
+  }catch(e){}
+}
+// spoken distance in the same units the drive card shows (feet / miles)
+function voiceDist(m){
+  const ft=m*3.28084;
+  if(ft>=1000){
+    const mi=ft/5280;
+    if(mi>=0.9) return (Math.round(mi*10)/10)+' miles';
+    if(mi>=0.7) return 'three quarters of a mile';
+    if(mi>=0.45) return 'half a mile';
+    if(mi>=0.2) return 'a quarter mile';
+    return Math.round(ft/100)*100+' feet';
+  }
+  return Math.max(50,Math.round(ft/50)*50)+' feet';
+}
+function voiceRoad(name){
+  if(!name||name==='(unnamed)'||name==='the path') return '';
+  return String(name).replace(/\bDr\b/,'Drive').replace(/\bPkwy\b/,'Parkway')
+                     .replace(/\bBlvd\b/,'Boulevard').replace(/\bRd\b/,'Road')
+                     .replace(/\bLn\b/,'Lane').replace(/\bCt\b/,'Court')
+                     .replace(/\bSt\b/,'Street').replace(/\bAve\b/,'Avenue');
+}
+// "Turn left" / "Continue" -> spoken maneuver
+function voiceManeuver(turn,road,withDist){
+  const r=voiceRoad(road);
+  let m;
+  if(turn==='Turn left') m='turn left';
+  else if(turn==='Turn right') m='turn right';
+  else if(turn==='Bear left') m='bear left';
+  else if(turn==='Bear right') m='bear right';
+  else if(turn==='Make a U-turn') m='make a U-turn';
+  else m='continue straight';
+  if(r) m += (m==='continue straight'? ' on ' : ' onto ')+r;
+  return withDist ? ('In '+withDist+', '+m+'.') : (m.charAt(0).toUpperCase()+m.slice(1)+'.');
+}
+// true remaining distance to the turn node, corrected for progress along the current segment
+function voiceMetersToTurn(o,t){
+  try{
+    let d=0;
+    for(let k=o;k<t;k++) d+=hav([G.nodes[drivePath[k]*2],G.nodes[drivePath[k]*2+1]],[G.nodes[drivePath[k+1]*2],G.nodes[drivePath[k+1]*2+1]]);
+    const f=window.__lastFix;
+    if(f && t>o && drivePath[o+1]!=null){
+      const A=[G.nodes[drivePath[o]*2],G.nodes[drivePath[o]*2+1]];
+      const B=[G.nodes[drivePath[o+1]*2],G.nodes[drivePath[o+1]*2+1]];
+      const dAB=hav(A,B), dUB=hav([f.lat,f.lng],B);
+      if(dUB<dAB) d-=(dAB-dUB);      // we are already partway down this segment
+    }
+    return Math.max(0,d);
+  }catch(e){ return null; }
+}
+/* called by updateNextTurn on every position fix */
+function voiceUpdate(turnIdx,turn,road,meters){
+  if(!VOICE.on||!driveMode) return;
+  if(meters==null||isNaN(meters)) return;
+  const key=turnIdx+'|'+turn+'|'+(road||'');
+  if(key!==VOICE.turnKey){ VOICE.turnKey=key; VOICE.stages={}; }   // new maneuver: reset ladder
+  // pick the tightest trigger we have crossed but not yet announced
+  for(let i=0;i<VOICE.TRIG.length;i++){
+    const thr=VOICE.TRIG[i];
+    if(meters<=thr && !VOICE.stages[i]){
+      for(let j=0;j<=i;j++) VOICE.stages[j]=true;   // skip any looser stage we blew past
+      if(i===2){
+        // at the junction: bare command, and nothing to say for a straight-through node
+        if(turn!=='Continue') voiceSay(voiceManeuver(turn,'',''));
+      }else{
+        voiceSay(voiceManeuver(turn,road,voiceDist(meters)));
+      }
+      return;
+    }
+  }
+}
+function voiceArrive(){
+  if(!VOICE.on||VOICE.arrived) return;
+  VOICE.arrived=true;
+  voiceSay('You have arrived at your destination.');
+}
+/* no turns left ahead: count down to the destination instead of announcing it early */
+function voiceArriveUpdate(meters){
+  if(!VOICE.on||!driveMode) return;
+  if(VOICE.turnKey!=='ARRIVE'){ VOICE.turnKey='ARRIVE'; VOICE.stages={}; }
+  if(meters==null||isNaN(meters)) meters=0;
+  if(meters<=40){
+    VOICE.stages[0]=VOICE.stages[1]=VOICE.stages[2]=true;
+    voiceArrive();
+    return;
+  }
+  if(meters<=50 && !VOICE.stages[1]){ VOICE.stages[0]=VOICE.stages[1]=true; voiceSay('Your destination is ahead, in '+voiceDist(meters)+'.'); return; }
+  if(meters<=200 && !VOICE.stages[0]){ VOICE.stages[0]=true; voiceSay('In '+voiceDist(meters)+', you will arrive at your destination.'); }
+}
+function voiceStartRoute(){
+  VOICE.turnKey=null; VOICE.stages={}; VOICE.arrived=false;
+  voiceUnlock();
+  if(!VOICE.on) return;
+  let dest=''; try{ const d=document.getElementById('residentDestInput'); if(d&&d.value) dest=' to '+d.value; }catch(e){}
+  voiceSay('Starting navigation'+dest+'. Follow the highlighted path.');
+}
+function voiceStop(){
+  VOICE.turnKey=null; VOICE.stages={}; VOICE.arrived=false;
+  try{ if(window.speechSynthesis) speechSynthesis.cancel(); }catch(e){}
+}
+function voiceReroute(){ VOICE.turnKey=null; VOICE.stages={}; voiceSay('Rerouting.'); }
+function voiceSetMuted(muted,quiet){
+  VOICE.on=!muted;
+  try{ localStorage.setItem('cnVoiceMuted',muted?'1':'0'); }catch(e){}
+  const b=document.getElementById('voiceBtn');
+  if(b){
+    b.textContent=muted?'🔇':'🔊';
+    b.style.background=muted?'rgba(255,255,255,.96)':'rgba(230,243,246,.98)';
+    b.style.borderColor=muted?'#cfdadd':'#0099ba';
+    b.title=muted?'Voice guidance off':'Voice guidance on';
+  }
+  if(muted){ try{ speechSynthesis.cancel(); }catch(e){} }
+  else if(!quiet){ voiceUnlock(); voiceSay('Voice guidance on.'); }
+}
+function toggleVoice(){ voiceSetMuted(VOICE.on); }
+/* console helper: voiceTest() plays the full prompt ladder without driving anywhere */
+function voiceTest(){
+  voiceUnlock();
+  const lines=[
+    voiceManeuver('Turn left','Crosswater Pkwy',voiceDist(200)),
+    voiceManeuver('Turn left','Crosswater Pkwy',voiceDist(50)),
+    voiceManeuver('Turn left','',''),
+    'In 650 feet, you will arrive at your destination.',
+    'You have arrived at your destination.'
+  ];
+  lines.forEach((t,i)=>setTimeout(()=>{ VOICE.lastSaid=''; voiceSay(t); }, i*3200));
+  return lines;
+}
+document.addEventListener('DOMContentLoaded',()=>{
+  const b=document.getElementById('voiceBtn');
+  if(b){
+    b.classList.add('on');
+    b.addEventListener('click',function(ev){ ev.preventDefault(); ev.stopPropagation(); toggleVoice(); });
+  }
+  voiceSetMuted(!VOICE.on,true);   // paint the button to match the stored preference, silently
+});
+
 function updateNextTurn(offset){
   const path=drivePath; if(!path||path.length<2){ document.getElementById('nextTurnText').textContent='Arrive'; return; }
   const o=Math.max(0,offset||0);
   const t=firstTurnIndex(path, o);
-  if(t<0){ document.getElementById('nextTurnArrow').textContent='✓'; document.getElementById('nextTurnText').textContent='Arrive at destination'; document.getElementById('nextTurnDist').textContent=''; document.getElementById('nextTurnSub').textContent='You have arrived'; return; }
+  if(t<0){ document.getElementById('nextTurnArrow').textContent='✓'; document.getElementById('nextTurnText').textContent='Arrive at destination'; document.getElementById('nextTurnDist').textContent=''; document.getElementById('nextTurnSub').textContent='You have arrived'; try{ voiceArriveUpdate(voiceMetersToTurn(o,path.length-1)); }catch(e){} return; }
   // bearing of the CURRENT travel direction (from where we are toward t)
   const cur = path[Math.min(o+1, path.length-1)];
   const pA=path[o], pB=cur;
@@ -728,16 +1094,15 @@ function updateNextTurn(offset){
   const p1=path[t-1],p2=path[t], p3=path[Math.min(t+1,path.length-1)];
   const b1=bearingAng([G.nodes[p1*2],G.nodes[p1*2+1]],[G.nodes[p2*2],G.nodes[p2*2+1]]);
   const b2=bearingAng([G.nodes[p2*2],G.nodes[p2*2+1]],[G.nodes[p3*2],G.nodes[p3*2+1]]);
-  // turn severity at the junction
+  // turn severity at the junction — the REAL maneuver angle (arriving leg vs leaving leg)
   const dgTurn=(b2-b1+540)%360-180;
-  // overall direction from our heading to the turn
+  // how far the approach leg differs from our current heading (kept for reference only)
   const dgHead=(b1-b0+540)%360-180;
-  let arrow='↑', turn='Continue';
-  if(Math.abs(dgHead)>=25 && Math.abs(dgHead)<155){
-    turn = dgHead<0 ? 'Turn left' : 'Turn right';
-    arrow = dgHead<0 ? '←' : '→';
-  } else if(Math.abs(dgHead)>=155){ turn='Make a U-turn'; arrow='⟲'; }
-  else { turn='Continue'; arrow='↑'; }
+  // FIX: the card used to be labelled from dgHead, which decays to ~0 as you close in
+  // on the junction, so a real left turn read "Continue ↑" exactly when it mattered.
+  // Card, printed turn list and voice all classify from dgTurn now.
+  const cls=classifyTurn(dgTurn);
+  const turn=cls.turn, arrow=cls.arrow;
   document.getElementById('nextTurnArrow').textContent=arrow;
   let nm=edgeNameOf(p1,p2);
   const nxtNamed=nextNamedRoad(path, t);
@@ -757,6 +1122,12 @@ function updateNextTurn(offset){
   if(sub) sub.textContent=subTxt;
   const sr=document.getElementById('turnSubRow');
   if(sr){ sr.style.display='flex'; document.getElementById('nextTurnSubArrow').textContent=arrow; }
+  // ---- voice guidance: speak exactly what the card now shows ----
+  try{
+    const vRoad=(nm&&nm!=='(unnamed)')?nm:(nxtNamed||'');
+    const vM=voiceMetersToTurn(o,t);
+    voiceUpdate(t,turn,vRoad,vM==null?d:vM);
+  }catch(e){}
   updateTripInfo();
 }
 function nextNamedRoad(path, fromIdx){
@@ -1212,12 +1583,10 @@ function initCompass(){
 }
 function onCompass(e){
   if(e.webkitCompassHeading!=null){
-    setYouHeading(e.webkitCompassHeading);
-  } else if(e.alpha!=null){
-    // non-commercial Safari: convert alpha (0=N) to heading; alpha is +ccw from north
-    let h=(360 - e.alpha + (e.webkitCompassAccuracy||0)) % 360;
-    if(e.gamma!=null && Math.abs(e.gamma)>10) h=360-e.alpha; // tilted; ignore accuracy
-    setYouHeading((h+360)%360);
+    setYouHeading(e.webkitCompassHeading,'compass');
+  } else if(e.alpha!=null && (e.absolute===true || e.type==='deviceorientationabsolute')){
+    // absolute orientation (Android/Chrome): alpha is degrees counter-clockwise from north
+    setYouHeading((360-e.alpha)%360,'compass');
   }
 }
 // request compass permission alongside the location Allow flow (user gesture)
@@ -1226,7 +1595,8 @@ function tryEnableCompass(){
   if(DO && typeof DO.requestPermission==='function'){
     try{ DO.requestPermission().then(function(state){ if(state==='granted'){ compassActive=true; window.addEventListener('deviceorientation', onCompass, true); } }); }catch(e){}
   } else if(window.DeviceOrientationEvent){
-    // desktop/Android style: just add listener
+    // desktop/Android style: prefer the absolute (true-north) event when the device provides it
+    if('ondeviceorientationabsolute' in window){ window.addEventListener('deviceorientationabsolute', onCompass, true); }
     window.addEventListener('deviceorientation', onCompass, true); compassActive=true;
   }
 }
@@ -1235,7 +1605,7 @@ function requestLocation(force){
   try{ tryEnableCompass(); }catch(e){}
   navigator.geolocation.getCurrentPosition(pos=>{
     startPt={lat:pos.coords.latitude,lng:pos.coords.longitude};
-    try{ resetMapRotation(); }catch(e){}
+    try{ if(!driveMode) resetMapRotation(); }catch(e){}
     if(!youMarker){ youMarker=makeYouMarker(pos.coords.latitude,pos.coords.longitude,pos.coords.heading||0); }
     else { youMarker.setLatLng([pos.coords.latitude,pos.coords.longitude]); if(pos.coords&&pos.coords.heading!=null){ try{setYouHeading(pos.coords.heading);}catch(e){} } }
     lastYouLat=pos.coords.latitude; lastYouLng=pos.coords.longitude;
