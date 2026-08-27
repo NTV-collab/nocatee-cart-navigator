@@ -223,7 +223,7 @@ window.__drawWire=true;
 let EV_NAMES=new Set(); // loaded from ev_roads.json (OSM residential-classified)
 let G=null, compOf=null, nComp=0;
 
-const map = L.map("map",{zoomSnap:.5}).setView([30.10,-81.42],13);
+const map = L.map("map",{zoomSnap:.5, rotate:true, bearing:0}).setView([30.10,-81.42],13);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"&copy; OpenStreetMap contributors",maxZoom:19}).addTo(map);
 let satLayer=null, streetBaseTile=null;
 const SAT_URL='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
