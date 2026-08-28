@@ -441,7 +441,7 @@ function showRoute(path){
 let driveMode=false, drivePath=null;
 function ensureGraphReady(){
   if(!(G&&G.nodes&&G.nodes.length)){
-    try{ const abs=new URL('../app/public/data/graph.json', location.href).href;
+    try{ const abs=GRAPH_URL;
       return fetch(abs).then(r=>r.json()).then(j=>{ G=j; callHydrateRemovals(); try{ computeComponents(); }catch(e){} return true; }).catch(()=>false);
     }catch(e){ return Promise.resolve(false); }
   }
