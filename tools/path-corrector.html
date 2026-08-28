@@ -1686,8 +1686,7 @@ function enterDev(){
   document.getElementById('tabMap').classList.remove('on');
   // ensure graph is loaded, then draw the network in dev view
   if(G&&G.nodes&&G.nodes.length){ if(netVisible!==false){ try{ ensureNetwork(); }catch(e){} } return; }
-  const abs=new URL('../app/public/data/graph.json', location.href).href;
-  fetch(abs).then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); }).then(j=>{
+  fetch(GRAPH_URL).then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); }).then(j=>{
     G=j; callHydrateRemovals();
     try{ computeComponents(); }catch(e){}
     try{ ensureNetwork(); }catch(e){}
