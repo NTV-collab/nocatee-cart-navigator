@@ -581,7 +581,8 @@ function armRefixTimer(){
         lastFixTs=Date.now();
         const lat=pos.coords.latitude, lng=pos.coords.longitude;
         if(youMarker) youMarker.setLatLng([lat,lng]);
-        if(pos.coords&&pos.coords.heading!=null&&!isNaN(pos.coords.heading)&&(pos.coords.speed==null||pos.coords.speed>0.7)){ setYouHeading(pos.coords.heading,'gps'); } else { rotateYouMarker(lat,lng); }
+        lastSpeed=pos.coords.speed!=null?pos.coords.speed:0; lastSpeedTS=Date.now();
+        if(pos.coords&&pos.coords.heading!=null&&!isNaN(pos.coords.heading)&&(pos.coords.speed==null||pos.coords.speed>0.7)){ setYouHeading(pos.coords.heading,'gps'); } else if(lastCompass!=null&&lastSpeed<=0.7){ setYouHeading(lastCompass,'compass'); } else { rotateYouMarker(lat,lng); }
         if(!driveMode){ if(!lastFollowT||hav([lastFollowT[0],lastFollowT[1]],[lat,lng])>25){ map.setView([lat,lng], Math.max(map.getZoom(),15), {animate:true}); lastFollowT=[lat,lng]; } }
       },()=>{}, {enableHighAccuracy:true, timeout:6000, maximumAge:8000}); }catch(e){}
     }
@@ -609,7 +610,8 @@ function ensureWatch(){
     // move "you" marker
     if(!youMarker){ youMarker=makeYouMarker(lat,lng,0); }
     else youMarker.setLatLng([lat,lng]);
-    if(pos.coords&&pos.coords.heading!=null&&!isNaN(pos.coords.heading)&&(pos.coords.speed==null||pos.coords.speed>0.7)){ setYouHeading(pos.coords.heading,'gps'); } else { rotateYouMarker(lat,lng); }
+    lastSpeed=pos.coords.speed!=null?pos.coords.speed:0; lastSpeedTS=Date.now();
+    if(pos.coords&&pos.coords.heading!=null&&!isNaN(pos.coords.heading)&&(pos.coords.speed==null||pos.coords.speed>0.7)){ setYouHeading(pos.coords.heading,'gps'); } else if(lastCompass!=null&&lastSpeed<=0.7){ setYouHeading(lastCompass,'compass'); } else { rotateYouMarker(lat,lng); }
     // follow the user in Map view too (soft, so the arrow stays centered while walking)
     if(!driveMode){
       if(NAV.up){ map.setView([lat,lng], Math.max(map.getZoom(),15), {animate:false}); lastFollowT=[lat,lng]; }
@@ -725,6 +727,7 @@ function navApplyPuck(){
     const m=youMarker&&youMarker.getElement(); if(!m) return;
     const d=m.querySelector('div'); if(!d) return;
     const b=NAV.up?navNorm(NAV.bearing):0;
+    // heading is degrees CLOCKWISE from north; rotate the (up-pointing) arrow that many deg
     d.style.transform='rotate('+Math.round(navNorm(NAV.heading-b))+'deg)';
   }catch(e){}
 }
@@ -1585,11 +1588,19 @@ function initCompass(){
 }
 function onCompass(e){
   if(e.webkitCompassHeading!=null){
-    setYouHeading(e.webkitCompassHeading,'compass');
+    // iOS: this is the device-top heading in true-north degrees (already geographic)
+    lastCompass=e.webkitCompassHeading;
+    if(!movingFast()) setYouHeading(lastCompass,'compass');
   } else if(e.alpha!=null && (e.absolute===true || e.type==='deviceorientationabsolute')){
-    // absolute orientation (Android/Chrome): alpha is degrees counter-clockwise from north
-    setYouHeading((360-e.alpha)%360,'compass');
+    // Android/Chrome absolute: alpha is degrees clockwise from north? (spec: 0=N,90=E)
+    lastCompass=(360-e.alpha)%360;
+    if(!movingFast()) setYouHeading(lastCompass,'compass');
   }
+}
+let lastCompass=null, lastSpeedTS=0, lastSpeed=0;
+function movingFast(){
+  // returns true when GPS says we are moving (use GPS course over compass)
+  return (Date.now()-lastSpeedTS)<3000 && lastSpeed>0.7;
 }
 // request compass permission alongside the location Allow flow (user gesture)
 function tryEnableCompass(){
