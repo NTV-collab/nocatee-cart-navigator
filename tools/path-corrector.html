@@ -583,7 +583,7 @@ function armRefixTimer(){
         if(youMarker) youMarker.setLatLng([lat,lng]);
         if(pos.coords&&pos.coords.heading!=null&&!isNaN(pos.coords.heading)&&(pos.coords.speed==null||pos.coords.speed>0.7)){ setYouHeading(pos.coords.heading,'gps'); } else { rotateYouMarker(lat,lng); }
         if(!driveMode){ if(!lastFollowT||hav([lastFollowT[0],lastFollowT[1]],[lat,lng])>25){ map.setView([lat,lng], Math.max(map.getZoom(),15), {animate:true}); lastFollowT=[lat,lng]; } }
-      },()=>{}, {enableHighAccuracy:true, timeout:8000, maximumAge:20000}); }catch(e){}
+      },()=>{}, {enableHighAccuracy:true, timeout:6000, maximumAge:8000}); }catch(e){}
     }
   }, 25000);
 }
@@ -657,7 +657,7 @@ function ensureWatch(){
       }
       updateNextTurn(idx);
     }
-  }, err=>console.warn('gps err',err), {enableHighAccuracy:true, maximumAge:1500, timeout:12000});
+  }, err=>console.warn('gps err',err), {enableHighAccuracy:true, maximumAge:500, timeout:8000});
 }
 let lastYouLat=null,lastYouLng=null;
 function makeYouMarker(lat,lng,deg){
@@ -1622,7 +1622,7 @@ function requestLocation(force){
     if(force) setStatus('Location blocked. Enable it in your browser settings, then tap Allow/Recenter.', true);
     const note=document.getElementById('locNote'); if(note) note.style.display='block';
     const rsv3=document.getElementById('residentStartVal'); if(rsv3) rsv3.textContent='Use my location';
-  },{enableHighAccuracy:true, timeout:8000, maximumAge:30000});
+  },{enableHighAccuracy:true, timeout:6000, maximumAge:10000});
 }
 function enterResident(){
   document.getElementById('panel').style.display='none';
